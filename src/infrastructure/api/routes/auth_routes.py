@@ -9,19 +9,22 @@ from src.infrastructure.api.dependencies import get_current_user, get_profile_re
 from src.infrastructure.database.repositories.profile_repository import ProfileRepository
 
 router = APIRouter(
-    prefix="/auth", 
+    prefix="/auth",
     tags=["Authentication"],
     responses={
         401: {"description": "Unauthorized - Invalid or missing authentication token"},
-        422: {"description": "Validation Error - Invalid request format"}
-    }
+        422: {"description": "Validation Error - Invalid request format"},
+    },
 )
 
 
 class ValidateTokenResponse(BaseModel):
     """Response model for token validation."""
+
     user_id: str = Field(..., description="Unique identifier of the authenticated user")
-    email: str = Field(..., description="Email address of the authenticated user", example="user@example.com")
+    email: str = Field(
+        ..., description="Email address of the authenticated user", example="user@example.com"
+    )
 
 
 @router.post(
@@ -39,7 +42,7 @@ class ValidateTokenResponse(BaseModel):
     
     **Authentication required**: Yes (Bearer token)
     """,
-    response_description="User information confirming valid authentication"
+    response_description="User information confirming valid authentication",
 )
 def validate_token(
     user=Depends(get_current_user),
@@ -53,6 +56,7 @@ def validate_token(
 
 class UserProfileResponse(BaseModel):
     """Response model for user profile information."""
+
     id: str = Field(..., description="Unique identifier of the user")
     email: str = Field(..., description="Email address of the user", example="user@example.com")
     name: str | None = Field(None, description="Display name of the user", example="John Doe")
@@ -74,7 +78,7 @@ class UserProfileResponse(BaseModel):
     
     **Authentication required**: Yes (Bearer token)
     """,
-    response_description="Complete user profile information"
+    response_description="Complete user profile information",
 )
 def get_me(
     user=Depends(get_current_user),
@@ -82,16 +86,29 @@ def get_me(
 ):
     """Get current user's profile information."""
     prof = profiles.upsert(user.id, user.email)
-    return {"id": prof.id, "email": prof.email, "name": prof.display_name, "created_at": prof.created_at}
+    return {
+        "id": prof.id,
+        "email": prof.email,
+        "name": prof.display_name,
+        "created_at": prof.created_at,
+    }
 
 
 class UpdateProfileBody(BaseModel):
     """Request model for updating user profile."""
-    name: str = Field(..., min_length=1, max_length=100, description="Display name for the user", example="John Doe")
+
+    name: str = Field(
+        ...,
+        min_length=1,
+        max_length=100,
+        description="Display name for the user",
+        example="John Doe",
+    )
 
 
 class UpdateProfileResponse(BaseModel):
     """Response model for profile update."""
+
     id: str = Field(..., description="Unique identifier of the user")
     email: str = Field(..., description="Email address of the user")
     name: str = Field(..., description="Updated display name of the user")
@@ -112,9 +129,7 @@ class UpdateProfileResponse(BaseModel):
     **Authentication required**: Yes (Bearer token)
     """,
     response_description="Updated user profile information",
-    responses={
-        400: {"description": "Bad Request - Invalid name provided"}
-    }
+    responses={400: {"description": "Bad Request - Invalid name provided"}},
 )
 def update_profile(
     body: UpdateProfileBody,

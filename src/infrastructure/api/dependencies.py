@@ -36,7 +36,7 @@ def get_current_user(
         user = auth.validate_token(token)
         return user
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
 
 
 def get_storage() -> SupabaseStorage:

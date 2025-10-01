@@ -16,17 +16,20 @@ def create_app() -> FastAPI:
         description="""
         ## ChromaKit Backend API
 
-        FastAPI backend for academic image processing using NumPy (no OpenCV), Clean Architecture, and Supabase for auth, database, and storage.
+        FastAPI backend for academic image processing using NumPy (no OpenCV), Clean 
+        Architecture, and Supabase for auth, database, and storage.
 
         ### Features
         - **Authentication**: Token-based authentication with Supabase
         - **Image Management**: Upload, list, download, and delete images
-        - **Image Processing**: Various image processing operations including brightness, contrast, filters, and transformations
+        - **Image Processing**: Various image processing operations including brightness, 
+          contrast, filters, and transformations
         - **History Tracking**: Track all processing operations performed on images
         - **Clean Architecture**: Domain-driven design with clear separation of concerns
 
         ### Authentication
-        All endpoints (except root and health) require authentication via Bearer token in the Authorization header:
+        All endpoints (except root and health) require authentication via Bearer token 
+        in the Authorization header:
         ```
         Authorization: Bearer your-jwt-token
         ```
@@ -54,7 +57,7 @@ def create_app() -> FastAPI:
         "/",
         summary="API Root",
         description="Get basic information about the ChromaKit API",
-        response_description="API information including status and version"
+        response_description="API information including status and version",
     )
     def root():
         """Get API root information."""
@@ -64,7 +67,7 @@ def create_app() -> FastAPI:
         "/health",
         summary="Health Check",
         description="Check if the API service is running and healthy",
-        response_description="Health status of the API service"
+        response_description="Health status of the API service",
     )
     def health():
         """Check API health status."""

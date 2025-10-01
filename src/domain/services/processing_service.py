@@ -70,7 +70,9 @@ class ProcessingService:
 
     # Extract CMY channels from RGB: C=1-R, M=1-G, Y=1-B
     @staticmethod
-    def extract_cmy_channels(matrix: np.ndarray) -> tuple[np.ndarray | None, np.ndarray | None, np.ndarray | None]:
+    def extract_cmy_channels(
+        matrix: np.ndarray,
+    ) -> tuple[np.ndarray | None, np.ndarray | None, np.ndarray | None]:
         mat = matrix.astype(np.float32)
         if mat.ndim == 3 and mat.shape[2] >= 3:
             cyan = 1.0 - mat[..., 0]
@@ -107,7 +109,8 @@ class ProcessingService:
             ]
         return out
 
-    # Rotate by angle degrees around image center using nearest-neighbor sampling. Output keeps same size.
+    # Rotate by angle degrees around image center using nearest-neighbor sampling.
+    # Output keeps same size.
     @staticmethod
     def rotate(matrix: np.ndarray, angle: float) -> np.ndarray:
         mat = matrix.astype(np.float32)
@@ -164,10 +167,13 @@ class ProcessingService:
             raise ValueError("factor must be > 0")
         region = matrix.astype(np.float32)[y_start:y_end, x_start:x_end]
         if region.ndim == 3:
-            return np.kron(region, np.ones((factor, factor, 1), dtype=np.float32)).astype(np.float32)
+            return np.kron(region, np.ones((factor, factor, 1), dtype=np.float32)).astype(
+                np.float32
+            )
         return np.kron(region, np.ones((factor, factor), dtype=np.float32)).astype(np.float32)
 
-    # Merge images with transparency: out = (1 - a) * img1 + a * img2. Resize img2 to img1 shape if needed via simple nearest-neighbor.
+    # Merge images with transparency: out = (1 - a) * img1 + a * img2.
+    # Resize img2 to img1 shape if needed via simple nearest-neighbor.
     @staticmethod
     def merge_images(img1: np.ndarray, img2: np.ndarray, transparency: float) -> np.ndarray:
         a = float(np.clip(transparency, 0.0, 1.0))
@@ -184,7 +190,8 @@ class ProcessingService:
         out = np.clip(a1 * im1 + a * im2, 0.0, 1.0)
         return out.astype(np.float32)
 
-    # Calculate histogram per channel with 256 bins over [0, 1]. Returns dict with keys: "bins", "hist".
+    # Calculate histogram per channel with 256 bins over [0, 1].
+    # Returns dict with keys: "bins", "hist".
     @staticmethod
     def calculate_histogram(matrix: np.ndarray) -> dict[str, np.ndarray]:
         mat = np.clip(matrix.astype(np.float32), 0.0, 1.0)

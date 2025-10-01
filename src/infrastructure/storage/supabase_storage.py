@@ -64,7 +64,13 @@ class SupabaseStorage:
             full_path = self.local_dir / storage_path
             full_path.parent.mkdir(parents=True, exist_ok=True)
             full_path.write_bytes(image_bytes)
-            return StorageResult(path=str(storage_path), width=width, height=height, content_type=content_type, size=len(image_bytes))
+            return StorageResult(
+                path=str(storage_path),
+                width=width,
+                height=height,
+                content_type=content_type,
+                size=len(image_bytes),
+            )
         # real upload
         try:  # pragma: no cover - network
             self.client.storage.from_(self.bucket).upload(  # type: ignore[attr-defined]
@@ -73,9 +79,15 @@ class SupabaseStorage:
                 file_options={"content-type": content_type},
                 upsert=False,
             )
-            return StorageResult(path=storage_path, width=width, height=height, content_type=content_type, size=len(image_bytes))
+            return StorageResult(
+                path=storage_path,
+                width=width,
+                height=height,
+                content_type=content_type,
+                size=len(image_bytes),
+            )
         except Exception as exc:  # pragma: no cover
-            raise RuntimeError(f"Storage upload failed: {exc}")
+            raise RuntimeError(f"Storage upload failed: {exc}") from exc
 
     def download_to_numpy(self, path: str) -> np.ndarray:
         data = self.download_bytes(path)
@@ -101,4 +113,4 @@ class SupabaseStorage:
         try:  # pragma: no cover - network
             self.client.storage.from_(self.bucket).remove([path])  # type: ignore[attr-defined]
         except Exception as exc:
-            raise RuntimeError(f"Storage delete failed: {exc}")
+            raise RuntimeError(f"Storage delete failed: {exc}") from exc

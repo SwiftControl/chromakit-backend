@@ -19,7 +19,9 @@ class ProcessImageUseCase:
     history_repo: HistoryRepository
     processing: ProcessingService
 
-    def execute(self, user_id: str, image_id: str, operation: str, params: dict[str, Any]) -> ImageEntity:
+    def execute(
+        self, user_id: str, image_id: str, operation: str, params: dict[str, Any]
+    ) -> ImageEntity:
         # load source image
         image = self.image_repo.get(image_id)
         if image is None or image.user_id != user_id:
@@ -43,17 +45,32 @@ class ProcessImageUseCase:
         elif op == "grayscale_midgray":
             out = self.processing.grayscale_midgray(src)
         elif op == "binarize":
-            out = self.processing.binarize(self.processing.grayscale_luminosity(src), float(params.get("threshold", 0.5)))
+            out = self.processing.binarize(
+                self.processing.grayscale_luminosity(src), float(params.get("threshold", 0.5))
+            )
         elif op == "translate":
             out = self.processing.translate(src, int(params.get("dx", 0)), int(params.get("dy", 0)))
         elif op == "rotate":
             out = self.processing.rotate(src, float(params.get("angle", 0.0)))
         elif op == "crop":
-            out = self.processing.crop(src, int(params["x_start"]), int(params["x_end"]), int(params["y_start"]), int(params["y_end"]))
+            out = self.processing.crop(
+                src,
+                int(params["x_start"]),
+                int(params["x_end"]),
+                int(params["y_start"]),
+                int(params["y_end"]),
+            )
         elif op == "reduce_resolution":
             out = self.processing.reduce_resolution(src, int(params.get("factor", 2)))
         elif op == "enlarge_region":
-            out = self.processing.enlarge_region(src, int(params["x_start"]), int(params["x_end"]), int(params["y_start"]), int(params["y_end"]), int(params.get("factor", 2)))
+            out = self.processing.enlarge_region(
+                src,
+                int(params["x_start"]),
+                int(params["x_end"]),
+                int(params["y_start"]),
+                int(params["y_end"]),
+                int(params.get("factor", 2)),
+            )
         elif op == "merge_images":
             other_id = params.get("other_image_id")
             if not other_id:
@@ -64,7 +81,8 @@ class ProcessImageUseCase:
             img2 = self.storage.download_to_numpy(other.path)
             out = self.processing.merge_images(src, img2, float(params.get("transparency", 0.5)))
         elif op == "histogram":
-            # histogram is not persisted as image; return raises to guide route to different response
+            # histogram is not persisted as image; return raises to guide route
+            # to different response
             raise NotImplementedError("histogram")
         else:
             raise ValueError("Unsupported operation")

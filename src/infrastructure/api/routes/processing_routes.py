@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import Response
 
 from src.application.dtos.common_dto import HistogramResponse, ProcessingOperationResponse
 from src.application.dtos.image_dto import (
@@ -32,14 +31,14 @@ from src.infrastructure.api.dependencies import (
 )
 
 router = APIRouter(
-    prefix="/processing", 
+    prefix="/processing",
     tags=["Image Processing"],
     responses={
         400: {"description": "Bad Request - Invalid operation or parameters"},
         401: {"description": "Unauthorized - Invalid or missing authentication token"},
         404: {"description": "Not Found - Image does not exist or user doesn't have access"},
-        422: {"description": "Validation Error - Invalid request format"}
-    }
+        422: {"description": "Validation Error - Invalid request format"},
+    },
 )
 
 
@@ -66,7 +65,7 @@ router = APIRouter(
     **Authentication required**: Yes (Bearer token)
     """,
     response_description="Metadata of the processed image and operation details",
-    deprecated=True
+    deprecated=True,
 )
 async def process_image(
     operation: str,
@@ -76,7 +75,7 @@ async def process_image(
 ):
     """
     Process an image using a generic operation name.
-    
+
     DEPRECATED: Use specific operation endpoints for better type safety and documentation.
     """
     # special case: histogram returns raw histogram data, not a stored image
@@ -111,15 +110,17 @@ async def process_image(
     images: ImageRepository = get_image_repo()
     history: HistoryRepository = get_history_repo()
 
-    uc = ProcessImageUseCase(storage=storage, image_repo=images, history_repo=history, processing=processing)
+    uc = ProcessImageUseCase(
+        storage=storage, image_repo=images, history_repo=history, processing=processing
+    )
     try:
         entity = uc.execute(
             user_id=user.id, image_id=body.image_id, operation=operation, params=dict(body.params)
         )
     except NotImplementedError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     return ProcessImageResponse(
         image=ImageMetadata(
@@ -160,7 +161,7 @@ async def process_image(
     **Authentication required**: Yes (Bearer token)
     **Access control**: Users can only analyze their own images
     """,
-    response_description="Histogram data with frequency distributions per color channel"
+    response_description="Histogram data with frequency distributions per color channel",
 )
 async def get_histogram(
     image_id: str,
@@ -179,12 +180,18 @@ async def get_histogram(
         raise HTTPException(status_code=404, detail="Image not found")
     arr = storage.download_to_numpy(entity.path)
     hist = processing.calculate_histogram(arr)
+
     def to_dict(h):
         # map to spec-style keys
         if arr.ndim == 2:
             return {"gray": h["hist"].tolist()}
         else:
-            return {"red": h["hist"][0].tolist(), "green": h["hist"][1].tolist(), "blue": h["hist"][2].tolist()}
+            return {
+                "red": h["hist"][0].tolist(),
+                "green": h["hist"][1].tolist(),
+                "blue": h["hist"][2].tolist(),
+            }
+
     return {"histogram": to_dict(hist)}
 
 
@@ -216,8 +223,8 @@ async def get_histogram(
     responses={
         200: {"description": "Successfully processed image, returns URL and metadata"},
         400: {"description": "Invalid brightness factor (must be > 0)"},
-        404: {"description": "Image not found or access denied"}
-    }
+        404: {"description": "Image not found or access denied"},
+    },
 )
 async def op_brightness(
     body: BrightnessRequest,
@@ -226,14 +233,14 @@ async def op_brightness(
 ):
     """Adjust image brightness and return URL to the processed image."""
     from src.application.use_cases.process_image import ProcessImageUseCase
-    
+
     uc = ProcessImageUseCase(get_storage(), get_image_repo(), get_history_repo(), processing)
     entity = uc.execute(user.id, body.image_id, "brightness", {"factor": body.factor})
-    
+
     # Generate URL to access the processed image
     images = get_image_repo()
     image_url = images.get_public_url(entity.path)
-    
+
     return ProcessingOperationResponse(
         id=entity.id,
         url=image_url,
@@ -243,7 +250,7 @@ async def op_brightness(
         operation="brightness",
         parameters={"factor": body.factor},
         original_image_id=body.image_id,
-        created_at=entity.created_at.isoformat()
+        created_at=entity.created_at.isoformat(),
     )
 
 
@@ -252,7 +259,8 @@ async def op_brightness(
     response_model=ProcessingOperationResponse,
     summary="Adjust Image Contrast",
     description="""
-    Adjust the contrast of an image using logarithmic or exponential transformations and return URL to the processed result.
+    Adjust the contrast of an image using logarithmic or exponential transformations 
+    and return URL to the processed result.
     
     **Contrast Types:**
     - `logarithmic` - Compresses high values, expands low values (reduces harsh contrast)
@@ -281,8 +289,8 @@ async def op_brightness(
     responses={
         200: {"description": "Successfully processed image, returns URL and metadata"},
         400: {"description": "Invalid contrast type (must be 'logarithmic' or 'exponential')"},
-        404: {"description": "Image not found or access denied"}
-    }
+        404: {"description": "Image not found or access denied"},
+    },
 )
 async def op_contrast(
     body: ContrastRequest,
@@ -291,18 +299,20 @@ async def op_contrast(
 ):
     """Adjust image contrast and return URL to the processed image."""
     from src.application.use_cases.process_image import ProcessImageUseCase
-    
+
     uc = ProcessImageUseCase(get_storage(), get_image_repo(), get_history_repo(), processing)
     if body.type not in ("logarithmic", "exponential"):
-        raise HTTPException(status_code=400, detail="Contrast type must be 'logarithmic' or 'exponential'")
-    
+        raise HTTPException(
+            status_code=400, detail="Contrast type must be 'logarithmic' or 'exponential'"
+        )
+
     operation = "log_contrast" if body.type == "logarithmic" else "exp_contrast"
     entity = uc.execute(user.id, body.image_id, operation, {"k": body.intensity})
-    
+
     # Generate URL to access the processed image
     images = get_image_repo()
     image_url = images.get_public_url(entity.path)
-    
+
     return ProcessingOperationResponse(
         id=entity.id,
         url=image_url,
@@ -312,7 +322,7 @@ async def op_contrast(
         operation=f"contrast_{body.type}",
         parameters={"type": body.type, "intensity": body.intensity},
         original_image_id=body.image_id,
-        created_at=entity.created_at.isoformat()
+        created_at=entity.created_at.isoformat(),
     )
 
 
@@ -342,8 +352,8 @@ async def op_contrast(
     response_description="URL and metadata of the processed negative image",
     responses={
         200: {"description": "Successfully processed image, returns URL and metadata"},
-        404: {"description": "Image not found or access denied"}
-    }
+        404: {"description": "Image not found or access denied"},
+    },
 )
 async def op_negative(
     body: NegativeRequest,
@@ -352,14 +362,14 @@ async def op_negative(
 ):
     """Create negative (inverted) version of the image."""
     from src.application.use_cases.process_image import ProcessImageUseCase
-    
+
     uc = ProcessImageUseCase(get_storage(), get_image_repo(), get_history_repo(), processing)
     entity = uc.execute(user.id, body.image_id, "invert", {})
-    
+
     # Generate URL to access the processed image
     images = get_image_repo()
     image_url = images.get_public_url(entity.path)
-    
+
     return ProcessingOperationResponse(
         id=entity.id,
         url=image_url,
@@ -369,7 +379,7 @@ async def op_negative(
         operation="negative",
         parameters={},
         original_image_id=body.image_id,
-        created_at=entity.created_at.isoformat()
+        created_at=entity.created_at.isoformat(),
     )
 
 
@@ -378,7 +388,8 @@ async def op_negative(
     response_model=ProcessingOperationResponse,
     summary="Convert Image to Grayscale",
     description="""
-    Convert a color image to grayscale using different methods and return URL to access the processed result.
+    Convert a color image to grayscale using different methods and return URL to 
+    access the processed result.
     
     **Conversion Methods:**
     - `average` - Simple average of R, G, B channels: (R + G + B) / 3
@@ -403,9 +414,12 @@ async def op_negative(
     response_description="URL and metadata of the processed grayscale image",
     responses={
         200: {"description": "Successfully processed image, returns URL and metadata"},
-        400: {"description": "Invalid grayscale method (must be 'average', 'luminosity', or 'midgray')"},
-        404: {"description": "Image not found or access denied"}
-    }
+        400: {
+            "description": "Invalid grayscale method (must be 'average', 'luminosity', "
+            "or 'midgray')"
+        },
+        404: {"description": "Image not found or access denied"},
+    },
 )
 async def op_grayscale(
     body: GrayscaleRequest,
@@ -414,7 +428,7 @@ async def op_grayscale(
 ):
     """Convert color image to grayscale using specified method."""
     from src.application.use_cases.process_image import ProcessImageUseCase
-    
+
     uc = ProcessImageUseCase(get_storage(), get_image_repo(), get_history_repo(), processing)
     mapping = {
         "average": "grayscale_average",
@@ -422,14 +436,16 @@ async def op_grayscale(
         "midgray": "grayscale_midgray",
     }
     if body.method not in mapping:
-        raise HTTPException(status_code=400, detail="Grayscale method must be 'average', 'luminosity', or 'midgray'")
-    
+        raise HTTPException(
+            status_code=400, detail="Grayscale method must be 'average', 'luminosity', or 'midgray'"
+        )
+
     entity = uc.execute(user.id, body.image_id, mapping[body.method], {})
-    
+
     # Generate URL to access the processed image
     images = get_image_repo()
     image_url = images.get_public_url(entity.path)
-    
+
     return ProcessingOperationResponse(
         id=entity.id,
         url=image_url,
@@ -439,7 +455,7 @@ async def op_grayscale(
         operation=f"grayscale_{body.method}",
         parameters={"method": body.method},
         original_image_id=body.image_id,
-        created_at=entity.created_at.isoformat()
+        created_at=entity.created_at.isoformat(),
     )
 
 
@@ -448,7 +464,8 @@ async def op_grayscale(
     response_model=ProcessingOperationResponse,
     summary="Binarize Image",
     description="""
-    Convert an image to binary (black and white) using a threshold value and return URL to access the processed result.
+    Convert an image to binary (black and white) using a threshold value and return 
+    URL to access the processed result.
     
     **Threshold Guidelines:**
     - `0.0` = Everything becomes white (lowest threshold)
@@ -476,8 +493,8 @@ async def op_grayscale(
     responses={
         200: {"description": "Successfully processed image, returns URL and metadata"},
         400: {"description": "Invalid threshold value (must be between 0.0 and 1.0)"},
-        404: {"description": "Image not found or access denied"}
-    }
+        404: {"description": "Image not found or access denied"},
+    },
 )
 async def op_binarize(
     body: BinarizeRequest,
@@ -486,14 +503,14 @@ async def op_binarize(
 ):
     """Convert image to binary (black and white) using threshold."""
     from src.application.use_cases.process_image import ProcessImageUseCase
-    
+
     uc = ProcessImageUseCase(get_storage(), get_image_repo(), get_history_repo(), processing)
     entity = uc.execute(user.id, body.image_id, "binarize", {"threshold": body.threshold})
-    
+
     # Generate URL to access the processed image
     images = get_image_repo()
     image_url = images.get_public_url(entity.path)
-    
+
     return ProcessingOperationResponse(
         id=entity.id,
         url=image_url,
@@ -503,19 +520,66 @@ async def op_binarize(
         operation="binarize",
         parameters={"threshold": body.threshold},
         original_image_id=body.image_id,
-        created_at=entity.created_at.isoformat()
+        created_at=entity.created_at.isoformat(),
     )
 
 
-@router.post("/translate")
+@router.post(
+    "/translate",
+    response_model=ProcessingOperationResponse,
+    summary="Translate Image",
+    description="""
+    Translate (move) an image by specified horizontal and vertical offsets and return
+    URL to access the processed result.
+
+    **Offset Guidelines:**
+    - `dx`: Horizontal offset in pixels (positive = right, negative = left)
+    - `dy`: Vertical offset in pixels (positive = down, negative = up)
+
+    **Use Cases:**
+    - Repositioning images
+    - Creating animation frames
+    - Adjusting image alignment
+    - Image composition
+
+    **Technical Details:**
+    - Uses NumPy array manipulation for efficient translation
+    - Empty areas filled with appropriate background color
+    - Preserves image dimensions
+    - Creates new processed image accessible via returned URL
+
+    **Response**: URL and metadata for the processed image
+    **Authentication required**: Yes (Bearer token)
+    **Access control**: Users can only process their own images
+    """,
+    response_description="URL and metadata of the translated image",
+)
 async def op_translate(
     body: TranslateRequest,
     user=Depends(get_current_user),
     processing: ProcessingService = Depends(get_processing_service),
 ):
+    """Translate (move) image by specified horizontal and vertical offsets."""
+    from src.application.use_cases.process_image import ProcessImageUseCase
+
     uc = ProcessImageUseCase(get_storage(), get_image_repo(), get_history_repo(), processing)
     entity = uc.execute(user.id, body.image_id, "translate", {"dx": body.dx, "dy": body.dy})
-    return {"id": entity.id, "storage_path": entity.path}
+
+    # Generate URL to access the processed image
+    images = get_image_repo()
+    image_url = images.get_public_url(entity.path)
+
+    return ProcessingOperationResponse(
+        id=entity.id,
+        url=image_url,
+        width=entity.width,
+        height=entity.height,
+        mime_type=entity.mime_type,
+        operation="translate",
+        parameters={"dx": body.dx, "dy": body.dy},
+        original_image_id=body.image_id,
+        created_at=entity.created_at.isoformat(),
+    )
 
 
 @router.post(
@@ -542,7 +606,7 @@ async def op_translate(
     **Authentication required**: Yes (Bearer token)
     **Access control**: Users can only process their own images
     """,
-    response_description="URL and metadata of the rotated image"
+    response_description="URL and metadata of the rotated image",
 )
 async def op_rotate(
     body: RotateRequest,
@@ -551,14 +615,14 @@ async def op_rotate(
 ):
     """Rotate image by specified angle."""
     from src.application.use_cases.process_image import ProcessImageUseCase
-    
+
     uc = ProcessImageUseCase(get_storage(), get_image_repo(), get_history_repo(), processing)
     entity = uc.execute(user.id, body.image_id, "rotate", {"angle": body.angle})
-    
+
     # Generate URL to access the processed image
     images = get_image_repo()
     image_url = images.get_public_url(entity.path)
-    
+
     return ProcessingOperationResponse(
         id=entity.id,
         url=image_url,
@@ -568,7 +632,7 @@ async def op_rotate(
         operation="rotate",
         parameters={"angle": body.angle},
         original_image_id=body.image_id,
-        created_at=entity.created_at.isoformat()
+        created_at=entity.created_at.isoformat(),
     )
 
 
@@ -601,7 +665,7 @@ async def op_rotate(
     **Authentication required**: Yes (Bearer token)
     **Access control**: Users can only process their own images
     """,
-    response_description="URL and metadata of the cropped image"
+    response_description="URL and metadata of the cropped image",
 )
 async def op_crop(
     body: CropRequest,
@@ -610,15 +674,20 @@ async def op_crop(
 ):
     """Crop image to specified rectangular region."""
     from src.application.use_cases.process_image import ProcessImageUseCase
-    
+
     uc = ProcessImageUseCase(get_storage(), get_image_repo(), get_history_repo(), processing)
-    params = {"x_start": body.x_start, "x_end": body.x_end, "y_start": body.y_start, "y_end": body.y_end}
+    params = {
+        "x_start": body.x_start,
+        "x_end": body.x_end,
+        "y_start": body.y_start,
+        "y_end": body.y_end,
+    }
     entity = uc.execute(user.id, body.image_id, "crop", params)
-    
+
     # Generate URL to access the processed image
     images = get_image_repo()
     image_url = images.get_public_url(entity.path)
-    
+
     return ProcessingOperationResponse(
         id=entity.id,
         url=image_url,
@@ -628,27 +697,114 @@ async def op_crop(
         operation="crop",
         parameters=params,
         original_image_id=body.image_id,
-        created_at=entity.created_at.isoformat()
+        created_at=entity.created_at.isoformat(),
     )
 
 
-@router.post("/reduce-resolution")
+@router.post(
+    "/reduce-resolution",
+    response_model=ProcessingOperationResponse,
+    summary="Reduce Image Resolution",
+    description="""
+    Reduce the resolution of an image by a specified factor and return URL to access
+    the processed result.
+
+    **Factor Guidelines:**
+    - `2` = Half size (width/2, height/2)
+    - `3` = One-third size (width/3, height/3)
+    - `4` = Quarter size (width/4, height/4)
+    - Valid range: 2-10
+
+    **Use Cases:**
+    - Creating thumbnail images
+    - Reducing file size for faster loading
+    - Optimizing images for web display
+    - Creating image pyramids for multi-resolution viewing
+
+    **Technical Details:**
+    - Uses NumPy downsampling for efficient resolution reduction
+    - Maintains aspect ratio
+    - Preserves image quality with appropriate resampling
+    - Creates new processed image accessible via returned URL
+
+    **Response**: URL and metadata for the processed image
+    **Authentication required**: Yes (Bearer token)
+    **Access control**: Users can only process their own images
+    """,
+    response_description="URL and metadata of the reduced resolution image",
+)
 async def op_reduce_resolution(
     body: ReduceResolutionRequest,
     user=Depends(get_current_user),
     processing: ProcessingService = Depends(get_processing_service),
 ):
+    """Reduce image resolution by specified factor."""
+    from src.application.use_cases.process_image import ProcessImageUseCase
+
     uc = ProcessImageUseCase(get_storage(), get_image_repo(), get_history_repo(), processing)
     entity = uc.execute(user.id, body.image_id, "reduce_resolution", {"factor": body.factor})
-    return {"id": entity.id, "storage_path": entity.path}
+
+    # Generate URL to access the processed image
+    images = get_image_repo()
+    image_url = images.get_public_url(entity.path)
+
+    return ProcessingOperationResponse(
+        id=entity.id,
+        url=image_url,
+        width=entity.width,
+        height=entity.height,
+        mime_type=entity.mime_type,
+        operation="reduce_resolution",
+        parameters={"factor": body.factor},
+        original_image_id=body.image_id,
+        created_at=entity.created_at.isoformat(),
+    )
 
 
-@router.post("/enlarge-region")
+@router.post(
+    "/enlarge-region",
+    response_model=ProcessingOperationResponse,
+    summary="Enlarge Specific Region",
+    description="""
+    Enlarge (zoom) a specific rectangular region of an image and return URL to access
+    the processed result.
+
+    **Coordinate System:**
+    - Origin (0,0) is at top-left corner
+    - X increases rightward, Y increases downward
+    - All coordinates must be within image bounds
+
+    **Parameters:**
+    - `x_start`, `x_end`: Left and right edges of region
+    - `y_start`, `y_end`: Top and bottom edges of region
+    - `zoom_factor`: Enlargement multiplier (1-10)
+
+    **Use Cases:**
+    - Magnifying details in images
+    - Creating zoomed thumbnails
+    - Detail inspection and analysis
+    - Medical/scientific image examination
+
+    **Technical Details:**
+    - Extracts specified region and enlarges it
+    - Uses interpolation for quality preservation
+    - Result image size = region_size * zoom_factor
+    - Creates new processed image accessible via returned URL
+
+    **Response**: URL and metadata for the processed image
+    **Authentication required**: Yes (Bearer token)
+    **Access control**: Users can only process their own images
+    """,
+    response_description="URL and metadata of the enlarged region image",
+)
 async def op_enlarge_region(
     body: EnlargeRegionRequest,
     user=Depends(get_current_user),
     processing: ProcessingService = Depends(get_processing_service),
 ):
+    """Enlarge a specific rectangular region of an image."""
+    from src.application.use_cases.process_image import ProcessImageUseCase
+
     uc = ProcessImageUseCase(get_storage(), get_image_repo(), get_history_repo(), processing)
     params = {
         "x_start": body.x_start,
@@ -658,15 +814,68 @@ async def op_enlarge_region(
         "factor": body.zoom_factor,
     }
     entity = uc.execute(user.id, body.image_id, "enlarge_region", params)
-    return {"id": entity.id, "storage_path": entity.path}
+
+    # Generate URL to access the processed image
+    images = get_image_repo()
+    image_url = images.get_public_url(entity.path)
+
+    return ProcessingOperationResponse(
+        id=entity.id,
+        url=image_url,
+        width=entity.width,
+        height=entity.height,
+        mime_type=entity.mime_type,
+        operation="enlarge_region",
+        parameters=params,
+        original_image_id=body.image_id,
+        created_at=entity.created_at.isoformat(),
+    )
 
 
-@router.post("/merge")
+@router.post(
+    "/merge",
+    response_model=ProcessingOperationResponse,
+    summary="Merge Two Images",
+    description="""
+    Merge (blend) two images together with adjustable transparency and return URL to
+    access the processed result.
+
+    **Transparency Guidelines:**
+    - `0.0` = Second image fully transparent (only first image visible)
+    - `0.5` = Equal blend of both images (50/50 mix)
+    - `1.0` = Second image fully opaque (second image dominates)
+
+    **Requirements:**
+    - Both images must belong to the authenticated user
+    - Images are automatically resized if dimensions don't match
+    - Result dimensions match the first (base) image
+
+    **Use Cases:**
+    - Creating watermarks or overlays
+    - Blending multiple exposures
+    - Artistic compositing
+    - Creating double exposure effects
+
+    **Technical Details:**
+    - Uses alpha blending formula: result = img1 * (1 - alpha) + img2 * alpha
+    - NumPy-based efficient pixel blending
+    - Automatic dimension matching
+    - Creates new processed image accessible via returned URL
+
+    **Response**: URL and metadata for the processed image
+    **Authentication required**: Yes (Bearer token)
+    **Access control**: Users can only merge their own images
+    """,
+    response_description="URL and metadata of the merged image",
+)
 async def op_merge(
     body: MergeImagesRequest,
     user=Depends(get_current_user),
     processing: ProcessingService = Depends(get_processing_service),
 ):
+    """Merge two images with adjustable transparency."""
+    from src.application.use_cases.process_image import ProcessImageUseCase
+
     uc = ProcessImageUseCase(get_storage(), get_image_repo(), get_history_repo(), processing)
     entity = uc.execute(
         user.id,
@@ -674,7 +883,22 @@ async def op_merge(
         "merge_images",
         {"other_image_id": body.image2_id, "transparency": body.transparency},
     )
-    return {"id": entity.id, "storage_path": entity.path}
+
+    # Generate URL to access the processed image
+    images = get_image_repo()
+    image_url = images.get_public_url(entity.path)
+
+    return ProcessingOperationResponse(
+        id=entity.id,
+        url=image_url,
+        width=entity.width,
+        height=entity.height,
+        mime_type=entity.mime_type,
+        operation="merge_images",
+        parameters={"image2_id": body.image2_id, "transparency": body.transparency},
+        original_image_id=body.image1_id,
+        created_at=entity.created_at.isoformat(),
+    )
 
 
 @router.post(
@@ -682,7 +906,8 @@ async def op_merge(
     response_model=ProcessingOperationResponse,
     summary="Manipulate Color Channels",
     description="""
-    Enable/disable specific color channels or extract CMY channels and return URL to access the processed result.
+    Enable/disable specific color channels or extract CMY channels and return URL to 
+    access the processed result.
     
     **Supported Channels:**
     - `red`, `green`, `blue` - RGB color channels
@@ -709,7 +934,7 @@ async def op_merge(
     **Authentication required**: Yes (Bearer token)
     **Access control**: Users can only process their own images
     """,
-    response_description="URL and metadata of the channel-processed image"
+    response_description="URL and metadata of the channel-processed image",
 )
 async def op_channel(
     body: ChannelRequest,
@@ -727,10 +952,7 @@ async def op_channel(
     import numpy as np
 
     ch = body.channel.lower()
-    if arr.ndim == 2:
-        rgb = np.repeat(arr[..., None], 3, axis=2)
-    else:
-        rgb = arr.copy()
+    rgb = np.repeat(arr[..., None], 3, axis=2) if arr.ndim == 2 else arr.copy()
     if ch in ("red", "green", "blue"):
         idx = {"red": 0, "green": 1, "blue": 2}[ch]
         if body.enabled:
@@ -758,11 +980,13 @@ async def op_channel(
         original_filename=src_meta.original_filename,
         file_size=stored.size,
     )
-    history.create(user.id, entity.id, "channel", {"channel": body.channel, "enabled": body.enabled})
-    
+    history.create(
+        user.id, entity.id, "channel", {"channel": body.channel, "enabled": body.enabled}
+    )
+
     # Generate URL to access the processed image
     image_url = images.get_public_url(entity.path)
-    
+
     return ProcessingOperationResponse(
         id=entity.id,
         url=image_url,
@@ -772,5 +996,5 @@ async def op_channel(
         operation="channel",
         parameters={"channel": body.channel, "enabled": body.enabled},
         original_image_id=body.image_id,
-        created_at=entity.created_at.isoformat()
+        created_at=entity.created_at.isoformat(),
     )

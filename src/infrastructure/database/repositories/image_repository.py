@@ -84,7 +84,7 @@ class ImageRepository:
                 file_size=row["file_size"],
             )
         except Exception as exc:
-            raise RuntimeError(f"DB insert image failed: {exc}")
+            raise RuntimeError(f"DB insert image failed: {exc}") from exc
 
     def list_by_user(self, user_id: str) -> list[ImageEntity]:
         if self.disabled or self.client is None:
@@ -110,7 +110,7 @@ class ImageRepository:
                 )
             return out
         except Exception as exc:
-            raise RuntimeError(f"DB list images failed: {exc}")
+            raise RuntimeError(f"DB list images failed: {exc}") from exc
 
     def get(self, image_id: str) -> ImageEntity | None:
         if self.disabled or self.client is None:

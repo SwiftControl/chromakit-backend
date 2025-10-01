@@ -19,7 +19,14 @@ class ProfileRepository:
 
     def upsert(self, user_id: str, email: str | None) -> ProfileEntity:
         if self.disabled or self.client is None:
-            entity = ProfileEntity(id=user_id, email=email, created_at=None, display_name=self._mem.get(user_id, ProfileEntity(user_id, email, None, None)).display_name)
+            entity = ProfileEntity(
+                id=user_id,
+                email=email,
+                created_at=None,
+                display_name=self._mem.get(
+                    user_id, ProfileEntity(user_id, email, None, None)
+                ).display_name,
+            )
             self._mem[user_id] = entity
             return entity
         try:  # pragma: no cover - network
@@ -30,16 +37,22 @@ class ProfileRepository:
             return ProfileEntity(
                 id=row["id"],
                 email=row.get("email"),
-                created_at=datetime.fromisoformat(row["created_at"]) if row.get("created_at") else None,
+                created_at=(
+                    datetime.fromisoformat(row["created_at"]) if row.get("created_at") else None
+                ),
                 display_name=row.get("display_name"),
             )
         except Exception as exc:
-            raise RuntimeError(f"DB upsert profile failed: {exc}")
+            raise RuntimeError(f"DB upsert profile failed: {exc}") from exc
 
     def set_display_name(self, user_id: str, name: str) -> ProfileEntity:
         if self.disabled or self.client is None:
-            current = self._mem.get(user_id) or ProfileEntity(id=user_id, email=None, created_at=None, display_name=None)
-            updated = ProfileEntity(id=user_id, email=current.email, created_at=current.created_at, display_name=name)
+            current = self._mem.get(user_id) or ProfileEntity(
+                id=user_id, email=None, created_at=None, display_name=None
+            )
+            updated = ProfileEntity(
+                id=user_id, email=current.email, created_at=current.created_at, display_name=name
+            )
             self._mem[user_id] = updated
             return updated
         try:  # pragma: no cover - network
@@ -49,8 +62,10 @@ class ProfileRepository:
             return ProfileEntity(
                 id=row["id"],
                 email=row.get("email"),
-                created_at=datetime.fromisoformat(row["created_at"]) if row.get("created_at") else None,
+                created_at=(
+                    datetime.fromisoformat(row["created_at"]) if row.get("created_at") else None
+                ),
                 display_name=row.get("display_name"),
             )
         except Exception as exc:
-            raise RuntimeError(f"DB update profile failed: {exc}")
+            raise RuntimeError(f"DB update profile failed: {exc}") from exc

@@ -59,4 +59,3 @@ def test_process_brightness_and_history(client, auth_header):
     assert r2.status_code == 200
     hist = r2.json()["history"]
     assert any(h["operation"] == "brightness" for h in hist)
-

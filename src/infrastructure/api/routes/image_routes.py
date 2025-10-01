@@ -25,13 +25,13 @@ from src.infrastructure.database.repositories.image_repository import ImageRepos
 from src.infrastructure.storage.supabase_storage import SupabaseStorage
 
 router = APIRouter(
-    prefix="/images", 
+    prefix="/images",
     tags=["Image Management"],
     responses={
         401: {"description": "Unauthorized - Invalid or missing authentication token"},
         404: {"description": "Not Found - Image does not exist or user doesn't have access"},
-        422: {"description": "Validation Error - Invalid request format"}
-    }
+        422: {"description": "Validation Error - Invalid request format"},
+    },
 )
 
 
@@ -39,7 +39,7 @@ def _load_numpy_from_upload(file: UploadFile) -> tuple[np.ndarray, int, str]:
     data = file.file.read()
     img = Image.open(BytesIO(data)).convert("RGB")
     arr = np.asarray(img).astype(np.float32) / 255.0
-    return arr, len(data), Image.MIME[img.format] if img.format in Image.MIME else "image/png"
+    return arr, len(data), Image.MIME.get(img.format, "image/png")
 
 
 @router.post(
@@ -63,8 +63,8 @@ def _load_numpy_from_upload(file: UploadFile) -> tuple[np.ndarray, int, str]:
     response_description="Metadata of the successfully uploaded image",
     responses={
         400: {"description": "Bad Request - Invalid image file or unsupported format"},
-        413: {"description": "Payload Too Large - File size exceeds limit"}
-    }
+        413: {"description": "Payload Too Large - File size exceeds limit"},
+    },
 )
 async def upload_image(
     file: UploadFile = File(..., description="Image file to upload"),
@@ -76,7 +76,7 @@ async def upload_image(
     try:
         arr, size, mime = _load_numpy_from_upload(file)
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Invalid image file: {exc}")
+        raise HTTPException(status_code=400, detail=f"Invalid image file: {exc}") from exc
     ext = (file.filename or "image.png").split(".")[-1].lower()
     uc = UploadImageUseCase(storage=storage, image_repo=images)
     entity = uc.execute(
@@ -119,7 +119,7 @@ async def upload_image(
     
     **Authentication required**: Yes (Bearer token)
     """,
-    response_description="Paginated list of user images with metadata"
+    response_description="Paginated list of user images with metadata",
 )
 async def list_images(
     user=Depends(get_current_user),
@@ -170,7 +170,7 @@ async def list_images(
     **Authentication required**: Yes (Bearer token)
     **Access control**: Users can only access their own images
     """,
-    response_description="Complete metadata for the requested image"
+    response_description="Complete metadata for the requested image",
 )
 async def get_image(
     image_id: str,
@@ -209,9 +209,7 @@ async def get_image(
     The response will have the correct Content-Type header based on the image format.
     """,
     response_description="Binary image file data",
-    responses={
-        200: {"content": {"image/*": {}}, "description": "Image file content"}
-    }
+    responses={200: {"content": {"image/*": {}}, "description": "Image file content"}},
 )
 async def download_image(
     image_id: str,
@@ -243,7 +241,7 @@ async def download_image(
     **Authentication required**: Yes (Bearer token)
     **Access control**: Users can only delete their own images
     """,
-    response_description="Confirmation of successful deletion"
+    response_description="Confirmation of successful deletion",
 )
 async def delete_image(
     image_id: str,

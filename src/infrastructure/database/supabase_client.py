@@ -46,7 +46,7 @@ class SupabaseAuthAdapter:
                 raise ValueError("Invalid access token")
             return UserInfo(id=user.id, email=user.email)  # type: ignore[attr-defined]
         except Exception as exc:  # pragma: no cover - network path
-            raise ValueError(f"Invalid access token: {exc}")
+            raise ValueError(f"Invalid access token: {exc}") from exc
 
 
 # Simple reusable singleton client getter for repositories/storage

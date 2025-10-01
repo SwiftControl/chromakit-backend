@@ -7,13 +7,13 @@ from src.infrastructure.api.dependencies import get_current_user, get_history_re
 from src.infrastructure.database.repositories.history_repository import HistoryRepository
 
 router = APIRouter(
-    prefix="/history", 
+    prefix="/history",
     tags=["Processing History"],
     responses={
         401: {"description": "Unauthorized - Invalid or missing authentication token"},
         404: {"description": "Not Found - History item does not exist or user doesn't have access"},
-        422: {"description": "Validation Error - Invalid request format"}
-    }
+        422: {"description": "Validation Error - Invalid request format"},
+    },
 )
 
 
@@ -32,12 +32,14 @@ router = APIRouter(
     
     **Authentication required**: Yes (Bearer token)
     """,
-    response_description="List of processing history items"
+    response_description="List of processing history items",
 )
 async def list_history(
     user=Depends(get_current_user),
     history: HistoryRepository = Depends(get_history_repo),
-    limit: int = Query(50, ge=1, le=200, description="Maximum number of history items to return (1-200)"),
+    limit: int = Query(
+        50, ge=1, le=200, description="Maximum number of history items to return (1-200)"
+    ),
     offset: int = Query(0, ge=0, description="Number of history items to skip from the beginning"),
     image_id: str | None = Query(None, description="Filter history by specific image ID"),
 ):
@@ -45,7 +47,6 @@ async def list_history(
     items = history.list_by_user(user.id)
     if image_id:
         items = [h for h in items if h.image_id == image_id]
-    total = len(items)
     page = items[offset : offset + limit]
     out = [
         HistoryItem(
@@ -77,7 +78,7 @@ async def list_history(
     **Authentication required**: Yes (Bearer token)
     **Access control**: Users can only access their own history items
     """,
-    response_description="Detailed information about the processing operation"
+    response_description="Detailed information about the processing operation",
 )
 async def get_history(
     history_id: str,
@@ -111,7 +112,7 @@ async def get_history(
     **Authentication required**: Yes (Bearer token)
     **Access control**: Users can only delete their own history items
     """,
-    response_description="Confirmation of successful deletion"
+    response_description="Confirmation of successful deletion",
 )
 async def delete_history(
     history_id: str,

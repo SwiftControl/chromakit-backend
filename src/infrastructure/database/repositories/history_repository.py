@@ -55,13 +55,19 @@ class HistoryRepository:
                 created_at=datetime.fromisoformat(row["created_at"]),
             )
         except Exception as exc:
-            raise RuntimeError(f"DB insert history failed: {exc}")
+            raise RuntimeError(f"DB insert history failed: {exc}") from exc
 
     def list_by_user(self, user_id: str) -> list[EditHistoryEntity]:
         if self.disabled or self.client is None:
             return [h for h in _MEM_HISTORY.values() if h.user_id == user_id]
         try:  # pragma: no cover - network
-            res = self.client.table("edit_history").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
+            res = (
+                self.client.table("edit_history")
+                .select("*")
+                .eq("user_id", user_id)
+                .order("created_at", desc=True)
+                .execute()
+            )
             rows = res.data or []
             out: list[EditHistoryEntity] = []
             for row in rows:
@@ -77,7 +83,7 @@ class HistoryRepository:
                 )
             return out
         except Exception as exc:
-            raise RuntimeError(f"DB list history failed: {exc}")
+            raise RuntimeError(f"DB list history failed: {exc}") from exc
 
     def get(self, hist_id: str) -> EditHistoryEntity | None:
         if self.disabled or self.client is None:
