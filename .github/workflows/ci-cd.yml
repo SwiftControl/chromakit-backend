@@ -160,12 +160,14 @@ jobs:
     - name: Generate SBOM
       uses: anchore/sbom-action@v0
       with:
-        image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+        image: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
         format: spdx-json
         output-file: sbom.spdx.json
+        registry-username: ${{ github.actor }}
+        registry-password: ${{ secrets.GITHUB_TOKEN }}
         
     - name: Upload SBOM
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: sbom
         path: sbom.spdx.json
@@ -175,41 +177,53 @@ jobs:
     needs: build
     if: github.ref == 'refs/heads/develop'
     environment: staging
-    
+
     steps:
     - name: Deploy to staging server
       uses: appleboy/ssh-action@v1.0.0
       with:
         host: ${{ secrets.STAGING_HOST }}
-        username: ${{ secrets.STAGING_USER }}
+        username: deploy
         key: ${{ secrets.STAGING_SSH_KEY }}
         port: ${{ secrets.STAGING_PORT }}
         script: |
           set -e
-          cd /opt/chromakit-backend
-          
+
           # Login to GitHub Container Registry
           echo "🔐 Logging into GitHub Container Registry..."
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-          
-          # Pull latest images
-          echo "📦 Pulling latest Docker images..."
-          docker-compose -f docker-compose.prod.yml pull
-          
-          # Stop and start containers
-          echo "� Redeploying containers..."
-          docker-compose -f docker-compose.prod.yml down
-          docker-compose -f docker-compose.prod.yml up -d
-          
+
+          # Pull latest image
+          echo "📦 Pulling latest Docker image..."
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:develop
+
+          # Stop and remove existing container
+          echo "🛑 Stopping existing container..."
+          docker stop chromakit-backend-staging || true
+          docker rm chromakit-backend-staging || true
+
+          # Start new container
+          echo "🚀 Starting new container..."
+          docker run -d \
+            --name chromakit-backend-staging \
+            --restart unless-stopped \
+            -p 8000:8000 \
+            -e SUPABASE_URL="${{ secrets.SUPABASE_URL }}" \
+            -e SUPABASE_ANON_KEY="${{ secrets.SUPABASE_ANON_KEY }}" \
+            -e SUPABASE_SERVICE_ROLE_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -e ENVIRONMENT=staging \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:develop
+
           # Health check
+          echo "⏳ Waiting for service to start..."
           sleep 30
-          if curl -f -m 5 http://localhost:80/health > /dev/null 2>&1; then
+          if curl -f -m 5 http://localhost:8000/health > /dev/null 2>&1; then
             echo "✅ Staging deployment successful!"
           else
             echo "⚠️ Health check failed - check logs"
-            docker-compose -f docker-compose.prod.yml logs --tail=20
+            docker logs --tail=20 chromakit-backend-staging
           fi
-          
+
           # Clean up old images
           docker image prune -f
 
@@ -218,43 +232,51 @@ jobs:
     needs: build
     if: github.ref == 'refs/heads/main'
     environment: production
-    
+
     steps:
     - name: Deploy to production server
       uses: appleboy/ssh-action@v1.0.0
       with:
         host: ${{ secrets.PRODUCTION_HOST }}
-        username: ${{ secrets.PRODUCTION_USER }}
+        username: deploy
         key: ${{ secrets.PRODUCTION_SSH_KEY }}
         port: ${{ secrets.PRODUCTION_PORT }}
         script: |
           set -e
-          cd /opt/chromakit-backend
-          
+
           # Login to GitHub Container Registry
           echo "🔐 Logging into GitHub Container Registry..."
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-          
-          # Pull latest images
-          echo "📦 Pulling latest Docker images..."
-          docker-compose -f docker-compose.prod.yml pull
-          
-          # Stop existing containers gracefully
-          echo "🛑 Stopping existing containers..."
-          docker-compose -f docker-compose.prod.yml down
-          
-          # Start services with new images
-          echo "🚀 Starting updated services..."
-          docker-compose -f docker-compose.prod.yml up -d
-          
+
+          # Pull latest image
+          echo "📦 Pulling latest Docker image..."
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+          # Stop and remove existing container
+          echo "🛑 Stopping existing container..."
+          docker stop chromakit-backend || true
+          docker rm chromakit-backend || true
+
+          # Start new container
+          echo "🚀 Starting new container..."
+          docker run -d \
+            --name chromakit-backend \
+            --restart unless-stopped \
+            -p 8000:8000 \
+            -e SUPABASE_URL="${{ secrets.SUPABASE_URL }}" \
+            -e SUPABASE_ANON_KEY="${{ secrets.SUPABASE_ANON_KEY }}" \
+            -e SUPABASE_SERVICE_ROLE_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -e ENVIRONMENT=production \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
           # Wait for services to be ready
-          echo "⏳ Waiting for services to start..."
+          echo "⏳ Waiting for service to start..."
           sleep 45
-          
+
           # Health check with fallbacks
           echo "🔍 Running health check..."
           HEALTH_OK=false
-          
+
           # Try HTTPS first
           if curl -f -m 10 https://chromakit_backend.adriangaitan.dev/health > /dev/null 2>&1; then
             echo "✅ HTTPS deployment successful!"
@@ -276,22 +298,22 @@ jobs:
             echo "🌐 Backend running - check nginx configuration"
             HEALTH_OK=true
           fi
-          
+
           # Show container status
           echo "📊 Container status:"
-          docker-compose -f docker-compose.prod.yml ps
-          
+          docker ps --filter name=chromakit-backend
+
           if [ "$HEALTH_OK" = "false" ]; then
             echo "❌ Health check failed!"
             echo "📝 Recent logs:"
-            docker-compose -f docker-compose.prod.yml logs --tail=30
+            docker logs --tail=30 chromakit-backend
             exit 1
           fi
-          
+
           # Clean up old images
           echo "🧹 Cleaning up old Docker images..."
           docker image prune -f
-          
+
           echo "✅ Deployment completed successfully!"
 
   notify:
