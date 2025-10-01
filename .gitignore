@@ -1,0 +1,20 @@
+# Environments
+.venv/
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+
+# Tools
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+
+# Local storage for fake Supabase
+.local_storage/
+
