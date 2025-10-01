@@ -76,7 +76,7 @@ class ProcessImageUseCase:
             path=stored.path,
             width=stored.width,
             height=stored.height,
-            content_type=stored.content_type,
+            mime_type=stored.content_type,
             original_id=image.id,
         )
         # history
