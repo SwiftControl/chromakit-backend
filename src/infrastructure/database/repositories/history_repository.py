@@ -21,7 +21,12 @@ class HistoryRepository:
         self.disabled = os.getenv("SUPABASE_DISABLED", "0") == "1"
 
     def create(
-        self, user_id: str, image_id: str, operation: str, params: dict[str, Any]
+        self,
+        user_id: str,
+        image_id: str,
+        operation_type: str,
+        parameters: dict[str, Any],
+        result_storage_path: str | None = None,
     ) -> EditHistoryEntity:
         now = datetime.now(UTC)
         if self.disabled or self.client is None:
@@ -30,8 +35,9 @@ class HistoryRepository:
                 id=hist_id,
                 user_id=user_id,
                 image_id=image_id,
-                operation=operation,
-                params=params,
+                operation_type=operation_type,
+                parameters=parameters,
+                result_storage_path=result_storage_path,
                 created_at=now,
             )
             _MEM_HISTORY[entity.id] = entity
@@ -40,18 +46,21 @@ class HistoryRepository:
             data = {
                 "user_id": user_id,
                 "image_id": image_id,
-                "operation": operation,
-                "params": params,
+                "operation_type": operation_type,
+                "parameters": parameters,
                 "created_at": now.isoformat(),
             }
+            if result_storage_path:
+                data["result_storage_path"] = result_storage_path
             res = self.client.table("edit_history").insert(data).execute()
             row = res.data[0]
             return EditHistoryEntity(
                 id=row["id"],
                 user_id=row["user_id"],
                 image_id=row["image_id"],
-                operation=row["operation"],
-                params=row.get("params", {}),
+                operation_type=row["operation_type"],
+                parameters=row.get("parameters", {}),
+                result_storage_path=row.get("result_storage_path"),
                 created_at=datetime.fromisoformat(row["created_at"]),
             )
         except Exception as exc:
@@ -76,8 +85,9 @@ class HistoryRepository:
                         id=row["id"],
                         user_id=row["user_id"],
                         image_id=row["image_id"],
-                        operation=row["operation"],
-                        params=row.get("params", {}),
+                        operation_type=row["operation_type"],
+                        parameters=row.get("parameters", {}),
+                        result_storage_path=row.get("result_storage_path"),
                         created_at=datetime.fromisoformat(row["created_at"]),
                     )
                 )
@@ -97,8 +107,9 @@ class HistoryRepository:
                 id=row["id"],
                 user_id=row["user_id"],
                 image_id=row["image_id"],
-                operation=row["operation"],
-                params=row.get("params", {}),
+                operation_type=row["operation_type"],
+                parameters=row.get("parameters", {}),
+                result_storage_path=row.get("result_storage_path"),
                 created_at=datetime.fromisoformat(row["created_at"]),
             )
         except Exception:

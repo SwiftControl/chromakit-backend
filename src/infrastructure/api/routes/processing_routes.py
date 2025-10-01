@@ -901,6 +901,7 @@ async def op_channel(
         created_at=entity.created_at.isoformat(),
     )
 
+
 @router.post(
     "/{operation}",
     response_model=ProcessImageResponse,
@@ -997,4 +998,3 @@ async def process_image(
         operation=operation,
         params=body.params,
     )
-

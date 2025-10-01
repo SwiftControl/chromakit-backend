@@ -48,17 +48,7 @@ async def list_history(
     if image_id:
         items = [h for h in items if h.image_id == image_id]
     page = items[offset : offset + limit]
-    out = [
-        HistoryItem(
-            id=h.id,
-            user_id=h.user_id,
-            image_id=h.image_id,
-            operation=h.operation,
-            params=h.params,
-            created_at=h.created_at,
-        )
-        for h in page
-    ]
+    out = [HistoryItem.from_entity(h) for h in page]
     return ListHistoryResponse(history=out)
 
 
@@ -89,14 +79,7 @@ async def get_history(
     item = history.get(history_id)
     if item is None or item.user_id != user.id:
         raise HTTPException(status_code=404, detail="History item not found or access denied")
-    return HistoryItem(
-        id=item.id,
-        user_id=item.user_id,
-        image_id=item.image_id,
-        operation=item.operation,
-        params=item.params,
-        created_at=item.created_at,
-    )
+    return HistoryItem.from_entity(item)
 
 
 @router.delete(

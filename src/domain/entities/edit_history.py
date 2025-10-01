@@ -10,6 +10,7 @@ class EditHistoryEntity:
     id: str
     user_id: str
     image_id: str
-    operation: str
-    params: dict[str, Any]
+    operation_type: str
+    parameters: dict[str, Any]
+    result_storage_path: str | None
     created_at: datetime

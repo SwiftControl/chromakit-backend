@@ -22,6 +22,18 @@ class HistoryItem(BaseModel):
     )
     created_at: datetime = Field(..., description="ISO timestamp when the operation was performed")
 
+    @staticmethod
+    def from_entity(entity) -> HistoryItem:
+        """Convert EditHistoryEntity to HistoryItem DTO."""
+        return HistoryItem(
+            id=entity.id,
+            user_id=entity.user_id,
+            image_id=entity.image_id,
+            operation=entity.operation_type,  # Map operation_type to operation
+            params=entity.parameters,  # Map parameters to params
+            created_at=entity.created_at,
+        )
+
 
 class ListHistoryResponse(BaseModel):
     """Response model for listing processing history with pagination."""

@@ -100,5 +100,11 @@ class ProcessImageUseCase:
             file_size=stored.size,
         )
         # history
-        self.history_repo.create(user_id=user_id, image_id=entity.id, operation=op, params=params)
+        self.history_repo.create(
+            user_id=user_id,
+            image_id=entity.id,
+            operation_type=op,
+            parameters=params,
+            result_storage_path=entity.path,
+        )
         return entity
