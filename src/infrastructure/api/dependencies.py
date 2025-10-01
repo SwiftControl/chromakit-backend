@@ -13,6 +13,7 @@ from src.infrastructure.database.supabase_client import (
     SupabaseAuthAdapter,
     UserInfo,
     get_supabase_client,
+    get_supabase_storage_client,
 )
 from src.infrastructure.storage.supabase_storage import SupabaseStorage
 
@@ -40,7 +41,7 @@ def get_current_user(
 
 
 def get_storage() -> SupabaseStorage:
-    client = get_supabase_client()
+    client = get_supabase_storage_client()
     return SupabaseStorage(client)
 
 

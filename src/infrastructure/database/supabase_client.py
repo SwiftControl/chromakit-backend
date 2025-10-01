@@ -51,9 +51,11 @@ class SupabaseAuthAdapter:
 
 # Simple reusable singleton client getter for repositories/storage
 _CLIENT_SINGLETON: Client | None = None
+_STORAGE_CLIENT_SINGLETON: Client | None = None
 
 
 def get_supabase_client() -> Client | None:
+    """Get Supabase client for auth and database operations (uses anon key)."""
     global _CLIENT_SINGLETON
     disabled = os.getenv("SUPABASE_DISABLED", "0") == "1"
     url = os.getenv("SUPABASE_URL")
@@ -63,3 +65,23 @@ def get_supabase_client() -> Client | None:
     if _CLIENT_SINGLETON is None:
         _CLIENT_SINGLETON = create_client(url, key)
     return _CLIENT_SINGLETON
+
+
+def get_supabase_storage_client() -> Client | None:
+    """Get Supabase client for storage operations.
+
+    Uses service role key if available (bypasses RLS), otherwise uses anon key.
+    """
+    global _STORAGE_CLIENT_SINGLETON
+    disabled = os.getenv("SUPABASE_DISABLED", "0") == "1"
+    url = os.getenv("SUPABASE_URL")
+
+    # Prefer service role key for storage, fall back to anon key
+    service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    key = service_key if service_key else os.getenv("SUPABASE_ANON_KEY")
+
+    if disabled or create_client is None or not url or not key:
+        return None
+    if _STORAGE_CLIENT_SINGLETON is None:
+        _STORAGE_CLIENT_SINGLETON = create_client(url, key)
+    return _STORAGE_CLIENT_SINGLETON

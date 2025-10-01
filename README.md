@@ -138,16 +138,25 @@ uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 ## Environment variables
 Copy `.env.example` to `.env` and adjust:
 ```
-SUPABASE_URL=
-SUPABASE_ANON_KEY=
+SUPABASE_URL=https://your-project-id.supabase.co
+SUPABASE_ANON_KEY=your_anon_key_here
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
 SUPABASE_STORAGE_BUCKET=images
-SUPABASE_DISABLED=1
+SUPABASE_DISABLED=0
 SUPABASE_STORAGE_LOCAL_DIR=.local_storage
 ```
 
+**Key Configuration Options:**
+
 With `SUPABASE_DISABLED=1`:
-- Auth is bypassed (any Bearer token accepted) for local dev.
-- Storage writes to `.local_storage/` and database tables are emulated in-memory.
+- Auth is bypassed (any Bearer token accepted) for local dev
+- Storage writes to `.local_storage/` and database tables are emulated in-memory
+
+With Supabase enabled (`SUPABASE_DISABLED=0`):
+- `SUPABASE_ANON_KEY`: Used for authentication (validates user JWT tokens)
+- `SUPABASE_SERVICE_ROLE_KEY`: Used for storage operations to bypass RLS policies (optional but recommended)
+  - If provided: Storage operations bypass Row-Level Security
+  - If empty: Storage operations respect RLS policies (ensure policies are configured correctly)
 
 ---
 
