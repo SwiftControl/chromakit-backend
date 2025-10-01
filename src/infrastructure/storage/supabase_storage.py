@@ -77,7 +77,6 @@ class SupabaseStorage:
                 path=storage_path,
                 file=image_bytes,
                 file_options={"content-type": content_type},
-                upsert=False,
             )
             return StorageResult(
                 path=storage_path,
