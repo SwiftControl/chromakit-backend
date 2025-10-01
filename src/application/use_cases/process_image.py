@@ -96,6 +96,8 @@ class ProcessImageUseCase:
             height=stored.height,
             mime_type=stored.content_type,
             original_id=image.id,
+            original_filename=image.original_filename,  # Copy from parent image
+            file_size=stored.size,
         )
         # history
         self.history_repo.create(user_id=user_id, image_id=entity.id, operation=op, params=params)

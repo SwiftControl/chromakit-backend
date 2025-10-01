@@ -77,13 +77,16 @@ async def upload_image(
         arr, size, mime = _load_numpy_from_upload(file)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"Invalid image file: {exc}") from exc
-    ext = (file.filename or "image.png").split(".")[-1].lower()
+    # Ensure we always have a filename (FastAPI should provide it, but be defensive)
+    filename = file.filename or "uploaded_image.png"
+    ext = filename.split(".")[-1].lower() if "." in filename else "png"
+
     uc = UploadImageUseCase(storage=storage, image_repo=images)
     entity = uc.execute(
         user_id=user.id,
         array=arr,
         ext=ext,
-        original_filename=file.filename,
+        original_filename=filename,
         file_size=size,
         mime_type=mime,
     )
