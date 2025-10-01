@@ -22,30 +22,49 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-        
     - name: Install uv
-      uses: astral-sh/setup-uv@v2
+      uses: astral-sh/setup-uv@v3
+      with:
+        version: "latest"
+        
+    - name: Set up Python with uv
+      run: uv python install 3.11
+        
+    - name: Create test environment file
+      run: |
+        cp .env.example .env
+        echo "SUPABASE_DISABLED=1" >> .env
+        echo "SUPABASE_STORAGE_LOCAL_DIR=.local_storage" >> .env
       
     - name: Install dependencies
       run: |
-        uv venv
-        uv pip install -e .
-        uv pip install pytest pytest-cov pytest-asyncio httpx
+        uv sync --extra dev
         
-    - name: Run tests
+    - name: Run linting
       run: |
-        source .venv/bin/activate
-        pytest tests/ -v --cov=src --cov-report=xml --cov-report=html
+        uv run ruff check .
+        uv run black --check .
         
-    - name: Upload coverage reports
-      uses: codecov/codecov-action@v3
+    - name: Run tests with coverage
+      run: |
+        uv run pytest tests/ -v --cov=src --cov-report=xml --cov-report=term-missing --cov-report=html
+        
+    - name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@v4
       with:
+        token: ${{ secrets.CODECOV_TOKEN }}
         file: ./coverage.xml
-        fail_ci_if_error: true
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+      if: always()
+        
+    - name: Upload coverage artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report
+        path: htmlcov/
+      if: always()
 
   security:
     runs-on: ubuntu-latest
@@ -54,6 +73,20 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+      
+    - name: Set up Python
+      run: uv python install 3.11
+      
+    - name: Install dependencies
+      run: uv sync --extra dev
+      
+    - name: Run security checks
+      run: |
+        uv run bandit -r src/ -f json -o bandit-report.json || true
+        uv run safety check --json --output safety-report.json || true
       
     - name: Run Trivy vulnerability scanner
       uses: aquasecurity/trivy-action@master
@@ -68,6 +101,15 @@ jobs:
       if: always()
       with:
         sarif_file: 'trivy-results.sarif'
+        
+    - name: Upload security artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: security-reports
+        path: |
+          bandit-report.json
+          safety-report.json
+      if: always()
 
   build:
     runs-on: ubuntu-latest

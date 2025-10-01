@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import os
-from dataclasses import asdict, replace
-from datetime import datetime, timezone
-from typing import Optional
+from dataclasses import asdict
+from datetime import UTC, datetime
 
 from src.domain.entities.image import ImageEntity
 
@@ -17,7 +16,7 @@ _MEM_IMAGES: dict[str, ImageEntity] = {}
 
 
 class ImageRepository:
-    def __init__(self, client: Optional[Client]) -> None:
+    def __init__(self, client: Client | None) -> None:
         self.client = client
         self.disabled = os.getenv("SUPABASE_DISABLED", "0") == "1"
         # in-memory fallback
@@ -30,11 +29,11 @@ class ImageRepository:
         width: int,
         height: int,
         mime_type: str,
-        original_id: Optional[str] = None,
-        original_filename: Optional[str] = None,
-        file_size: Optional[int] = None,
+        original_id: str | None = None,
+        original_filename: str | None = None,
+        file_size: int | None = None,
     ) -> ImageEntity:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if self.disabled or self.client is None:
             image_id = f"img_{len(_MEM_IMAGES)+1}"
             entity = ImageEntity(
@@ -113,7 +112,7 @@ class ImageRepository:
         except Exception as exc:
             raise RuntimeError(f"DB list images failed: {exc}")
 
-    def get(self, image_id: str) -> Optional[ImageEntity]:
+    def get(self, image_id: str) -> ImageEntity | None:
         if self.disabled or self.client is None:
             return _MEM_IMAGES.get(image_id)
         try:  # pragma: no cover - network

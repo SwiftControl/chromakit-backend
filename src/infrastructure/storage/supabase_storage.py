@@ -4,10 +4,9 @@ import os
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
-from PIL import Image
 import numpy as np
+from PIL import Image
 
 try:
     from supabase import Client
@@ -27,7 +26,7 @@ class StorageResult:
 class SupabaseStorage:
     """Storage adapter for Supabase Storage with a local fake fallback."""
 
-    def __init__(self, client: Optional[Client]) -> None:
+    def __init__(self, client: Client | None) -> None:
         self.client = client
         self.bucket = os.getenv("SUPABASE_STORAGE_BUCKET", "images")
         self.disabled = os.getenv("SUPABASE_DISABLED", "0") == "1"

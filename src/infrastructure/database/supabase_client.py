@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
 try:
-    from supabase import create_client, Client
+    from supabase import Client, create_client
 except Exception:  # pragma: no cover - env without supabase installed
     Client = Any  # type: ignore
     create_client = None  # type: ignore
@@ -14,7 +14,7 @@ except Exception:  # pragma: no cover - env without supabase installed
 @dataclass(slots=True)
 class UserInfo:
     id: str
-    email: Optional[str]
+    email: str | None
 
 
 class SupabaseAuthAdapter:
@@ -27,7 +27,7 @@ class SupabaseAuthAdapter:
         self.disabled = os.getenv("SUPABASE_DISABLED", "0") == "1"
         self.url = os.getenv("SUPABASE_URL")
         self.key = os.getenv("SUPABASE_ANON_KEY")
-        self._client: Optional[Client] = None
+        self._client: Client | None = None
         if not self.disabled and self.url and self.key and create_client is not None:
             self._client = create_client(self.url, self.key)
 
@@ -50,10 +50,10 @@ class SupabaseAuthAdapter:
 
 
 # Simple reusable singleton client getter for repositories/storage
-_CLIENT_SINGLETON: Optional[Client] = None
+_CLIENT_SINGLETON: Client | None = None
 
 
-def get_supabase_client() -> Optional[Client]:
+def get_supabase_client() -> Client | None:
     global _CLIENT_SINGLETON
     disabled = os.getenv("SUPABASE_DISABLED", "0") == "1"
     url = os.getenv("SUPABASE_URL")

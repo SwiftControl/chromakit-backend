@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 from datetime import datetime
-from typing import Optional
 
 from src.domain.entities.profile import ProfileEntity
 
@@ -13,12 +12,12 @@ except Exception:  # pragma: no cover
 
 
 class ProfileRepository:
-    def __init__(self, client: Optional[Client]) -> None:
+    def __init__(self, client: Client | None) -> None:
         self.client = client
         self.disabled = os.getenv("SUPABASE_DISABLED", "0") == "1"
         self._mem: dict[str, ProfileEntity] = {}
 
-    def upsert(self, user_id: str, email: Optional[str]) -> ProfileEntity:
+    def upsert(self, user_id: str, email: str | None) -> ProfileEntity:
         if self.disabled or self.client is None:
             entity = ProfileEntity(id=user_id, email=email, created_at=None, display_name=self._mem.get(user_id, ProfileEntity(user_id, email, None, None)).display_name)
             self._mem[user_id] = entity

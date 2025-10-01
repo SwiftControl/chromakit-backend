@@ -1,0 +1,26 @@
+coverage:
+  status:
+    project:
+      default:
+        target: 80%
+        threshold: 5%
+    patch:
+      default:
+        target: 70%
+        threshold: 5%
+
+  ignore:
+    - "tests/"
+    - "scripts/"
+    - "docs/"
+    - "src/main.py"
+
+comment:
+  layout: "reach,diff,flags,tree"
+  behavior: default
+  require_changes: false
+
+flags:
+  unittests:
+    paths:
+      - src/

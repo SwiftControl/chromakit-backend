@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
 
 
 @dataclass(frozen=True)
@@ -14,9 +13,9 @@ class ImageEntity:
     height: int
     mime_type: str
     created_at: datetime
-    original_id: Optional[str] = None  # if derived from another image
-    original_filename: Optional[str] = None
-    file_size: Optional[int] = None  # bytes
+    original_id: str | None = None  # if derived from another image
+    original_filename: str | None = None
+    file_size: int | None = None  # bytes
 
     # Backwards-compat property
     @property

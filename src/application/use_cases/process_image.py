@@ -5,11 +5,11 @@ from typing import Any
 
 import numpy as np
 
-from src.domain.services.processing_service import ProcessingService
-from src.infrastructure.storage.supabase_storage import SupabaseStorage
-from src.infrastructure.database.repositories.image_repository import ImageRepository
-from src.infrastructure.database.repositories.history_repository import HistoryRepository
 from src.domain.entities.image import ImageEntity
+from src.domain.services.processing_service import ProcessingService
+from src.infrastructure.database.repositories.history_repository import HistoryRepository
+from src.infrastructure.database.repositories.image_repository import ImageRepository
+from src.infrastructure.storage.supabase_storage import SupabaseStorage
 
 
 @dataclass

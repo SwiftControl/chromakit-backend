@@ -2,16 +2,19 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import Depends, Header, HTTPException, Security, status
+from fastapi import Depends, HTTPException, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from src.infrastructure.database.supabase_client import SupabaseAuthAdapter, get_supabase_client, UserInfo
-from src.infrastructure.database.repositories.image_repository import ImageRepository
-from src.infrastructure.database.repositories.history_repository import HistoryRepository
-from src.infrastructure.database.repositories.profile_repository import ProfileRepository
-from src.infrastructure.storage.supabase_storage import SupabaseStorage
 from src.domain.services.processing_service import ProcessingService
-
+from src.infrastructure.database.repositories.history_repository import HistoryRepository
+from src.infrastructure.database.repositories.image_repository import ImageRepository
+from src.infrastructure.database.repositories.profile_repository import ProfileRepository
+from src.infrastructure.database.supabase_client import (
+    SupabaseAuthAdapter,
+    UserInfo,
+    get_supabase_client,
+)
+from src.infrastructure.storage.supabase_storage import SupabaseStorage
 
 _bearer_scheme = HTTPBearer(auto_error=False)
 

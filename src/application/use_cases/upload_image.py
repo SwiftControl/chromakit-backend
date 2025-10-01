@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 import numpy as np
 
-from src.infrastructure.storage.supabase_storage import SupabaseStorage
-from src.infrastructure.database.repositories.image_repository import ImageRepository
 from src.domain.entities.image import ImageEntity
+from src.infrastructure.database.repositories.image_repository import ImageRepository
+from src.infrastructure.storage.supabase_storage import SupabaseStorage
 
 
 @dataclass
@@ -21,10 +20,10 @@ class UploadImageUseCase:
         array: np.ndarray,
         ext: str,
         *,
-        original_id: Optional[str] = None,
-        original_filename: Optional[str] = None,
-        file_size: Optional[int] = None,
-        mime_type: Optional[str] = None,
+        original_id: str | None = None,
+        original_filename: str | None = None,
+        file_size: int | None = None,
+        mime_type: str | None = None,
     ) -> ImageEntity:
         stored = self.storage.upload_numpy(user_id=user_id, array=array, ext=ext)
         entity = self.image_repo.create(

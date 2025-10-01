@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from src.domain.entities.edit_history import EditHistoryEntity
 
@@ -16,14 +16,14 @@ _MEM_HISTORY: dict[str, EditHistoryEntity] = {}
 
 
 class HistoryRepository:
-    def __init__(self, client: Optional[Client]) -> None:
+    def __init__(self, client: Client | None) -> None:
         self.client = client
         self.disabled = os.getenv("SUPABASE_DISABLED", "0") == "1"
 
     def create(
         self, user_id: str, image_id: str, operation: str, params: dict[str, Any]
     ) -> EditHistoryEntity:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if self.disabled or self.client is None:
             hist_id = f"hist_{len(_MEM_HISTORY)+1}"
             entity = EditHistoryEntity(
@@ -79,7 +79,7 @@ class HistoryRepository:
         except Exception as exc:
             raise RuntimeError(f"DB list history failed: {exc}")
 
-    def get(self, hist_id: str) -> Optional[EditHistoryEntity]:
+    def get(self, hist_id: str) -> EditHistoryEntity | None:
         if self.disabled or self.client is None:
             return _MEM_HISTORY.get(hist_id)
         try:  # pragma: no cover - network

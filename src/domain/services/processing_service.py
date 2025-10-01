@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Tuple, Dict
-
 import numpy as np
 
 
@@ -72,7 +70,7 @@ class ProcessingService:
 
     # Extract CMY channels from RGB: C=1-R, M=1-G, Y=1-B
     @staticmethod
-    def extract_cmy_channels(matrix: np.ndarray) -> Tuple[np.ndarray | None, np.ndarray | None, np.ndarray | None]:
+    def extract_cmy_channels(matrix: np.ndarray) -> tuple[np.ndarray | None, np.ndarray | None, np.ndarray | None]:
         mat = matrix.astype(np.float32)
         if mat.ndim == 3 and mat.shape[2] >= 3:
             cyan = 1.0 - mat[..., 0]
@@ -188,7 +186,7 @@ class ProcessingService:
 
     # Calculate histogram per channel with 256 bins over [0, 1]. Returns dict with keys: "bins", "hist".
     @staticmethod
-    def calculate_histogram(matrix: np.ndarray) -> Dict[str, np.ndarray]:
+    def calculate_histogram(matrix: np.ndarray) -> dict[str, np.ndarray]:
         mat = np.clip(matrix.astype(np.float32), 0.0, 1.0)
         bins = np.linspace(0.0, 1.0, 257, dtype=np.float32)
         if mat.ndim == 2:
