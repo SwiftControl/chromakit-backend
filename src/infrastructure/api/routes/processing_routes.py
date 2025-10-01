@@ -42,104 +42,6 @@ router = APIRouter(
 )
 
 
-@router.post(
-    "/{operation}",
-    response_model=ProcessImageResponse,
-    summary="Generic Image Processing Operation",
-    description="""
-    **⚠️ DEPRECATED**: Use specific operation endpoints instead (e.g., /processing/brightness)
-    
-    Perform a generic image processing operation by operation name.
-    
-    **Supported Operations:**
-    - `brightness` - Adjust image brightness
-    - `contrast` - Adjust image contrast  
-    - `grayscale` - Convert to grayscale
-    - `invert` - Create negative image
-    - `binarize` - Convert to binary (black/white)
-    - `rotate` - Rotate image
-    - `crop` - Crop image to specified region
-    - `translate` - Move image position
-    - `histogram` - Calculate color histogram (special case)
-    
-    **Authentication required**: Yes (Bearer token)
-    """,
-    response_description="Metadata of the processed image and operation details",
-    deprecated=True,
-)
-async def process_image(
-    operation: str,
-    body: ProcessImageRequest,
-    user=Depends(get_current_user),
-    processing: ProcessingService = Depends(get_processing_service),
-):
-    """
-    Process an image using a generic operation name.
-
-    DEPRECATED: Use specific operation endpoints for better type safety and documentation.
-    """
-    # special case: histogram returns raw histogram data, not a stored image
-    if operation.lower() == "histogram":
-        from src.infrastructure.api.dependencies import get_image_repo  # lazy import for DI
-        from src.infrastructure.database.repositories.image_repository import ImageRepository
-
-        images: ImageRepository = get_image_repo()
-        entity = images.get(body.image_id)
-        if entity is None or entity.user_id != user.id:
-            raise HTTPException(status_code=404, detail="Image not found")
-        from src.infrastructure.api.dependencies import get_storage
-        from src.infrastructure.storage.supabase_storage import SupabaseStorage
-
-        storage: SupabaseStorage = get_storage()
-        arr = storage.download_to_numpy(entity.path)
-        hist = processing.calculate_histogram(arr)
-        # Convert numpy arrays to lists for JSON
-        return {
-            "operation": "histogram",
-            "bins": hist["bins"].tolist(),
-            "hist": hist["hist"].tolist(),
-        }
-
-    # default: run processing use-case which persists new image and history
-    from src.infrastructure.api.dependencies import get_history_repo, get_image_repo, get_storage
-    from src.infrastructure.database.repositories.history_repository import HistoryRepository
-    from src.infrastructure.database.repositories.image_repository import ImageRepository
-    from src.infrastructure.storage.supabase_storage import SupabaseStorage
-
-    storage: SupabaseStorage = get_storage()
-    images: ImageRepository = get_image_repo()
-    history: HistoryRepository = get_history_repo()
-
-    uc = ProcessImageUseCase(
-        storage=storage, image_repo=images, history_repo=history, processing=processing
-    )
-    try:
-        entity = uc.execute(
-            user_id=user.id, image_id=body.image_id, operation=operation, params=dict(body.params)
-        )
-    except NotImplementedError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-
-    return ProcessImageResponse(
-        image=ImageMetadata(
-            id=entity.id,
-            user_id=entity.user_id,
-            path=entity.path,
-            width=entity.width,
-            height=entity.height,
-            mime_type=entity.mime_type,
-            created_at=entity.created_at,
-            original_id=entity.original_id,
-            original_filename=entity.original_filename,
-            file_size=entity.file_size,
-        ),
-        operation=operation,
-        params=body.params,
-    )
-
-
 @router.get(
     "/{image_id}/histogram",
     response_model=HistogramResponse,
@@ -998,3 +900,101 @@ async def op_channel(
         original_image_id=body.image_id,
         created_at=entity.created_at.isoformat(),
     )
+
+@router.post(
+    "/{operation}",
+    response_model=ProcessImageResponse,
+    summary="Generic Image Processing Operation",
+    description="""
+    **⚠️ DEPRECATED**: Use specific operation endpoints instead (e.g., /processing/brightness)
+    
+    Perform a generic image processing operation by operation name.
+    
+    **Supported Operations:**
+    - `brightness` - Adjust image brightness
+    - `contrast` - Adjust image contrast  
+    - `grayscale` - Convert to grayscale
+    - `invert` - Create negative image
+    - `binarize` - Convert to binary (black/white)
+    - `rotate` - Rotate image
+    - `crop` - Crop image to specified region
+    - `translate` - Move image position
+    - `histogram` - Calculate color histogram (special case)
+    
+    **Authentication required**: Yes (Bearer token)
+    """,
+    response_description="Metadata of the processed image and operation details",
+    deprecated=True,
+)
+async def process_image(
+    operation: str,
+    body: ProcessImageRequest,
+    user=Depends(get_current_user),
+    processing: ProcessingService = Depends(get_processing_service),
+):
+    """
+    Process an image using a generic operation name.
+
+    DEPRECATED: Use specific operation endpoints for better type safety and documentation.
+    """
+    # special case: histogram returns raw histogram data, not a stored image
+    if operation.lower() == "histogram":
+        from src.infrastructure.api.dependencies import get_image_repo  # lazy import for DI
+        from src.infrastructure.database.repositories.image_repository import ImageRepository
+
+        images: ImageRepository = get_image_repo()
+        entity = images.get(body.image_id)
+        if entity is None or entity.user_id != user.id:
+            raise HTTPException(status_code=404, detail="Image not found")
+        from src.infrastructure.api.dependencies import get_storage
+        from src.infrastructure.storage.supabase_storage import SupabaseStorage
+
+        storage: SupabaseStorage = get_storage()
+        arr = storage.download_to_numpy(entity.path)
+        hist = processing.calculate_histogram(arr)
+        # Convert numpy arrays to lists for JSON
+        return {
+            "operation": "histogram",
+            "bins": hist["bins"].tolist(),
+            "hist": hist["hist"].tolist(),
+        }
+
+    # default: run processing use-case which persists new image and history
+    from src.infrastructure.api.dependencies import get_history_repo, get_image_repo, get_storage
+    from src.infrastructure.database.repositories.history_repository import HistoryRepository
+    from src.infrastructure.database.repositories.image_repository import ImageRepository
+    from src.infrastructure.storage.supabase_storage import SupabaseStorage
+
+    storage: SupabaseStorage = get_storage()
+    images: ImageRepository = get_image_repo()
+    history: HistoryRepository = get_history_repo()
+
+    uc = ProcessImageUseCase(
+        storage=storage, image_repo=images, history_repo=history, processing=processing
+    )
+    try:
+        entity = uc.execute(
+            user_id=user.id, image_id=body.image_id, operation=operation, params=dict(body.params)
+        )
+    except NotImplementedError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    return ProcessImageResponse(
+        image=ImageMetadata(
+            id=entity.id,
+            user_id=entity.user_id,
+            path=entity.path,
+            width=entity.width,
+            height=entity.height,
+            mime_type=entity.mime_type,
+            created_at=entity.created_at,
+            original_id=entity.original_id,
+            original_filename=entity.original_filename,
+            file_size=entity.file_size,
+        ),
+        operation=operation,
+        params=body.params,
+    )
+

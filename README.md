@@ -106,8 +106,11 @@ IMG_ID=img_1
 curl -X POST \
   -H 'Authorization: Bearer test-token' \
   -H 'Content-Type: application/json' \
-  -d '{"image_id": "'$IMG_ID'", "params": {"factor": 0.1, "ext": "png"}}' \
+  -d '{"image_id": "'$IMG_ID'", "factor": 1.5}' \
   http://127.0.0.1:8000/processing/brightness
+
+# The response will include a URL to access the processed image
+# Response: {"id": "img_2", "url": "https://...", "operation": "brightness", ...}
 
 # History
 curl -H 'Authorization: Bearer test-token' http://127.0.0.1:8000/history
@@ -165,19 +168,55 @@ uv run black .
 
 ---
 
-## API Overview (implemented)
-- POST /auth/validate
-- POST /images/upload
-- GET /images
-- GET /images/{image_id}
-- DELETE /images/{image_id}
-- POST /processing/{operation}
-- GET /history
-- GET /history/{history_id}
+## API Overview
 
-Data model notes:
-- Images stored under `{user_id}/{uuid}.{ext}` in Supabase Storage (or `.local_storage/` locally)
-- Database tables expected: `profiles`, `images`, `edit_history`
+**📖 Complete API Documentation**: See [API_DOCUMENTATION.md](./API_DOCUMENTATION.md) for comprehensive endpoint reference, TypeScript types, and usage examples.
+
+### Core Endpoints
+
+**Authentication**:
+- `POST /auth/validate` - Validate JWT token
+- `GET /auth/me` - Get current user profile
+- `PATCH /auth/profile` - Update user profile
+
+**Image Management**:
+- `POST /images/upload` - Upload new image
+- `GET /images` - List user's images (paginated)
+- `GET /images/{image_id}` - Get image metadata
+- `GET /images/{image_id}/download` - Download image file
+- `DELETE /images/{image_id}` - Delete image
+
+**Image Processing** (all return processed image URLs):
+- `POST /processing/brightness` - Adjust brightness
+- `POST /processing/contrast` - Adjust contrast (logarithmic/exponential)
+- `POST /processing/negative` - Create negative/inverted image
+- `POST /processing/grayscale` - Convert to grayscale (3 methods)
+- `POST /processing/binarize` - Convert to binary (black/white)
+- `POST /processing/rotate` - Rotate image
+- `POST /processing/crop` - Crop rectangular region
+- `POST /processing/translate` - Move image position
+- `POST /processing/reduce-resolution` - Reduce image size
+- `POST /processing/enlarge-region` - Zoom specific region
+- `POST /processing/merge` - Merge two images with transparency
+- `POST /processing/channel` - Manipulate RGB/CMY channels
+- `GET /processing/{image_id}/histogram` - Calculate color histogram
+
+**Processing History**:
+- `GET /history` - List processing operations (paginated)
+- `GET /history/{history_id}` - Get specific operation details
+- `DELETE /history/{history_id}` - Delete history record
+
+### Key Features
+- ✅ All image processing happens in Python backend (NumPy-based)
+- ✅ All processing endpoints return URLs to processed images
+- ✅ Automatic processing history tracking
+- ✅ User-scoped access control
+- ✅ Comprehensive error handling
+- ✅ OpenAPI/Swagger documentation at `/docs`
+
+**Data Model**:
+- Images: `{user_id}/{uuid}.{ext}` in Supabase Storage (or `.local_storage/` locally)
+- Database tables: `profiles`, `images`, `edit_history`
 
 ---
 

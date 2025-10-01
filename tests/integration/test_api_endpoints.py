@@ -18,6 +18,7 @@ def test_auth_validate(client, auth_header):
     assert r.status_code == 200
     data = r.json()
     assert "user_id" in data
+    assert "email" in data
 
 
 essentials = {}
@@ -39,21 +40,25 @@ def test_upload_and_list(client, auth_header):
 
 def test_histogram_endpoint(client, auth_header):
     img_id = essentials["image_id"]
-    body = {"image_id": img_id, "params": {}}
-    r = client.post("/processing/histogram", headers=auth_header, json=body)
+    r = client.get(f"/processing/{img_id}/histogram", headers=auth_header)
     assert r.status_code == 200
     data = r.json()
-    assert data["operation"] == "histogram"
-    assert isinstance(data["bins"], list)
+    assert "histogram" in data
+    # For RGB images, should have red/green/blue channels
+    assert isinstance(data["histogram"], dict)
 
 
 def test_process_brightness_and_history(client, auth_header):
     img_id = essentials["image_id"]
-    body = {"image_id": img_id, "params": {"factor": 0.1, "ext": "png"}}
+    body = {"image_id": img_id, "factor": 1.5}
     r = client.post("/processing/brightness", headers=auth_header, json=body)
     assert r.status_code == 200, r.text
-    data = r.json()["image"]
-    assert data["original_id"] == img_id
+    data = r.json()
+    # Updated response format - returns ProcessingOperationResponse
+    assert "id" in data
+    assert "url" in data
+    assert data["operation"] == "brightness"
+    assert data["original_image_id"] == img_id
 
     r2 = client.get("/history", headers=auth_header)
     assert r2.status_code == 200

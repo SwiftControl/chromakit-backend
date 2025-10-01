@@ -37,7 +37,7 @@ class SupabaseAuthAdapter:
         if self.disabled or not self._client:
             # Return a deterministic fake user based on token hash
             fake_id = f"fake-{abs(hash(token)) % (10**10)}"
-            return UserInfo(id=fake_id, email=None)
+            return UserInfo(id=fake_id, email=f"{fake_id}@test.local")
         # Real validation via Supabase Auth API
         try:
             res = self._client.auth.get_user(token)  # type: ignore[attr-defined]

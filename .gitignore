@@ -97,3 +97,5 @@ docs/
 
 generate_api_report.py
 ./generate_api_report.py
+
+.local_storage/
