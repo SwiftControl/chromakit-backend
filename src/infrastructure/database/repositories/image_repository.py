@@ -68,21 +68,21 @@ class ImageRepository:
             data = asdict(entity)
             data.pop("id")
             data["created_at"] = now.isoformat()
-            # map to DB columns: content_type->mime_type if needed
-            data["content_type"] = data.pop("mime_type")
+            # map to DB columns: storage_path instead of path
+            data["storage_path"] = data.pop("path")
             res = self.client.table("images").insert(data).execute()
             row = res.data[0]
             return ImageEntity(
                 id=row["id"],
                 user_id=row["user_id"],
-                path=row["path"],
+                path=row["storage_path"],
                 width=row["width"],
                 height=row["height"],
-                mime_type=row.get("mime_type") or row.get("content_type"),
+                mime_type=row["mime_type"],
                 created_at=datetime.fromisoformat(row["created_at"]),
                 original_id=row.get("original_id"),
-                original_filename=row.get("original_filename"),
-                file_size=row.get("file_size"),
+                original_filename=row["original_filename"],
+                file_size=row["file_size"],
             )
         except Exception as exc:
             raise RuntimeError(f"DB insert image failed: {exc}")
@@ -99,14 +99,14 @@ class ImageRepository:
                     ImageEntity(
                         id=row["id"],
                         user_id=row["user_id"],
-                        path=row["path"],
+                        path=row["storage_path"],
                         width=row["width"],
                         height=row["height"],
-                        mime_type=row.get("mime_type") or row.get("content_type"),
+                        mime_type=row["mime_type"],
                         created_at=datetime.fromisoformat(row["created_at"]),
                         original_id=row.get("original_id"),
-                        original_filename=row.get("original_filename"),
-                        file_size=row.get("file_size"),
+                        original_filename=row["original_filename"],
+                        file_size=row["file_size"],
                     )
                 )
             return out
@@ -124,17 +124,27 @@ class ImageRepository:
             return ImageEntity(
                 id=row["id"],
                 user_id=row["user_id"],
-                path=row["path"],
+                path=row["storage_path"],
                 width=row["width"],
                 height=row["height"],
-                mime_type=row.get("mime_type") or row.get("content_type"),
+                mime_type=row["mime_type"],
                 created_at=datetime.fromisoformat(row["created_at"]),
                 original_id=row.get("original_id"),
-                original_filename=row.get("original_filename"),
-                file_size=row.get("file_size"),
+                original_filename=row["original_filename"],
+                file_size=row["file_size"],
             )
         except Exception:
             return None
+
+    def get_public_url(self, storage_path: str) -> str:
+        if self.disabled or self.client is None:
+            return f"/local-storage/{storage_path}"
+        try:  # pragma: no cover - network
+            bucket = os.getenv("SUPABASE_STORAGE_BUCKET", "images")
+            res = self.client.storage.from_(bucket).get_public_url(storage_path)  # type: ignore[attr-defined]
+            return res
+        except Exception:
+            return ""
 
     def delete(self, image_id: str) -> bool:
         if self.disabled or self.client is None:

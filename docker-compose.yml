@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  chromakit-backend:
+    build: .
+    container_name: chromakit-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_STORAGE_BUCKET=${SUPABASE_STORAGE_BUCKET:-images}
+      - SUPABASE_DISABLED=${SUPABASE_DISABLED:-0}
+      - SUPABASE_STORAGE_LOCAL_DIR=${SUPABASE_STORAGE_LOCAL_DIR:-.local_storage}
+    volumes:
+      # Persist local storage if SUPABASE_DISABLED=1
+      - ./data/.local_storage:/app/.local_storage
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - chromakit-network
+  nginx:
+    image: nginx:alpine
+    container_name: chromakit-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    networks:
+      - chromakit-network
+    depends_on:
+      - chromakit-backend
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+networks:
+  chromakit-network:
+    driver: bridge

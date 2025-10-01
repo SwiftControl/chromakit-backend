@@ -17,6 +17,7 @@ class ImageMetadata(BaseModel):
     original_id: Optional[str] = None
     original_filename: Optional[str] = None
     file_size: Optional[int] = None
+    url: Optional[str] = None
 
 
 class UploadImageResponse(BaseModel):

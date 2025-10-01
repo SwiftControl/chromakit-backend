@@ -12,7 +12,7 @@ Everything (code, comments, endpoints, docs) is in English as required.
 - Supabase (auth, database, storage) via supabase-py v2
 - Quality: Ruff and Black
 - Tests: Pytest (+ asyncio, coverage)
-- Package manager: uv (recommended) or pip
+- Package manager: uv (fast Python package installer and resolver)
 
 ## Project Structure (Clean Architecture)
 ```
@@ -116,16 +116,16 @@ curl -H 'Authorization: Bearer test-token' http://127.0.0.1:8000/history
 Notes:
 - Local storage path when `SUPABASE_DISABLED=1`: `.local_storage/{user_id}/{uuid}.{ext}`
 - To clean local files, stop the server and remove `.local_storage/`.
-- When connecting to a real Supabase project, set SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_JWT_SECRET and set `SUPABASE_DISABLED=0`.
+- When connecting to a real Supabase project, set SUPABASE_URL, SUPABASE_ANON_KEY and set `SUPABASE_DISABLED=0`.
 
 ---
 
-## Alternative: pip-only setup
+## Alternative setup without uv
+If you prefer using the standard Python tooling:
 ```bash
 python3.11 -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-pip install -e ".[dev]"
+python -m pip install -e ".[dev]"
 cp .env.example .env
 uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 ```
@@ -137,7 +137,6 @@ Copy `.env.example` to `.env` and adjust:
 ```
 SUPABASE_URL=
 SUPABASE_ANON_KEY=
-SUPABASE_JWT_SECRET=
 SUPABASE_STORAGE_BUCKET=images
 SUPABASE_DISABLED=1
 SUPABASE_STORAGE_LOCAL_DIR=.local_storage
@@ -182,7 +181,79 @@ Data model notes:
 
 ---
 
+## 🚀 Deployment
+
+### Docker Deployment (Recommended)
+
+Build and run with Docker:
+```bash
+# Development
+docker-compose up -d
+
+# Production
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+### Digital Ocean One-Click Deployment
+
+Deploy to Digital Ocean droplet with automated setup:
+
+```bash
+# 1. SSH into your Ubuntu 22.04 droplet
+ssh root@your_droplet_ip
+
+# 2. Run automated setup script
+curl -fsSL https://raw.githubusercontent.com/SwiftControl/chromakit-backend/main/scripts/setup-droplet.sh | bash
+
+# 3. Configure environment and deploy
+cd /opt/chromakit-backend
+cp .env.example .env
+# Edit .env with your Supabase credentials
+docker-compose -f docker-compose.prod.yml up -d
+
+# 4. Optional: Setup SSL
+./scripts/setup-ssl.sh your-domain.com
+```
+
+### GitHub Actions CI/CD
+
+Automated deployment on push to main/develop branches:
+
+1. **Configure Repository Secrets:**
+   - `PRODUCTION_HOST`: Your droplet IP
+   - `PRODUCTION_USER`: SSH username (usually `root`)
+   - `PRODUCTION_SSH_KEY`: Private SSH key
+   - `PRODUCTION_PORT`: SSH port (usually `22`)
+
+2. **Deployment Flow:**
+   - Push to `main` → Production deployment
+   - Push to `develop` → Staging deployment
+   - Pull requests → Run tests only
+
+### Architecture
+
+```
+Internet → Nginx (SSL, Rate Limiting) → FastAPI Backend → Supabase
+```
+
+**Features:**
+- 🔒 SSL termination with Let's Encrypt
+- 🛡️ Rate limiting and security headers
+- 📊 Health checks and monitoring
+- 🔄 Automatic deployments
+- 📝 Structured logging
+- 🐳 Container orchestration
+
+### Quick Links
+
+- 📖 **[Complete Deployment Guide](docs/deployment.md)**
+- ⚡ **[Quick Start Guide](docs/quick-start.md)**
+- 🔧 **[Configuration Examples](docs/)**
+
+---
+
 ## Troubleshooting
 - "ModuleNotFoundError: No module named 'src'" when running pytest: the test suite already configures the path; ensure you run tests from the project root with `uv run pytest` (or `pytest`) while the venv is active.
 - If `uv` warns about `VIRTUAL_ENV` mismatch, prefer `uv sync` and `uv run` from the project root with the `.venv` created above.
 - Pillow deprecation warnings about `mode` are harmless for now.
+- **Deployment issues**: Check the [deployment troubleshooting guide](docs/deployment.md#troubleshooting)

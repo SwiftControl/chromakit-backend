@@ -68,6 +68,7 @@ async def upload_image(
             original_id=entity.original_id,
             original_filename=entity.original_filename,
             file_size=entity.file_size,
+            url=images.get_public_url(entity.path),
         )
     )
 
@@ -97,6 +98,7 @@ async def list_images(
             original_id=it.original_id,
             original_filename=it.original_filename,
             file_size=it.file_size,
+            url=images.get_public_url(it.path),
         )
         for it in page
     ]
@@ -123,6 +125,7 @@ async def get_image(
         original_id=entity.original_id,
         original_filename=entity.original_filename,
         file_size=entity.file_size,
+        url=images.get_public_url(entity.path),
     )
 
 
