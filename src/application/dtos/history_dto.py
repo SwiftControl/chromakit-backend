@@ -5,6 +5,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from src.application.dtos.image_dto import ImageMetadata
+
 
 class HistoryItem(BaseModel):
     """Represents a single image processing operation in the history."""
@@ -21,9 +23,10 @@ class HistoryItem(BaseModel):
         ..., description="Parameters used for the operation", example={"factor": 1.2}
     )
     created_at: datetime = Field(..., description="ISO timestamp when the operation was performed")
+    image: ImageMetadata | None = Field(None, description="Metadata of the processed image")
 
     @staticmethod
-    def from_entity(entity) -> HistoryItem:
+    def from_entity(entity, image_metadata: ImageMetadata | None = None) -> HistoryItem:
         """Convert EditHistoryEntity to HistoryItem DTO."""
         return HistoryItem(
             id=entity.id,
@@ -32,6 +35,7 @@ class HistoryItem(BaseModel):
             operation=entity.operation_type,  # Map operation_type to operation
             params=entity.parameters,  # Map parameters to params
             created_at=entity.created_at,
+            image=image_metadata,
         )
 
 

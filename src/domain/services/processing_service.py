@@ -86,10 +86,11 @@ class ProcessingService:
     def translate(matrix: np.ndarray, dx: int, dy: int) -> np.ndarray:
         mat = matrix.astype(np.float32)
         h, w = mat.shape[:2]
-        if mat.ndim == 2:
-            out = np.zeros_like(mat)
-        else:
-            out = np.zeros((h, w, mat.shape[2]), dtype=np.float32)
+        out = (
+            np.zeros_like(mat)
+            if mat.ndim == 2
+            else np.zeros((h, w, mat.shape[2]), dtype=np.float32)
+        )
         # compute source and destination ranges
         x_src_start = max(0, -dx)
         y_src_start = max(0, -dy)

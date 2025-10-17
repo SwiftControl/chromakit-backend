@@ -148,6 +148,16 @@ class NegativeRequest(BaseModel):
     image_id: str = Field(..., description="ID of the image to invert", example="img_123456")
 
 
+class ResetImageRequest(BaseModel):
+    """Request model for resetting an image to its original (root) version."""
+
+    image_id: str = Field(
+        ...,
+        description="ID of any image in the version chain to reset to original",
+        example="img_123456",
+    )
+
+
 class BinarizeRequest(BaseModel):
     """Request model for image binarization."""
 

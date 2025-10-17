@@ -17,6 +17,7 @@ from src.application.dtos.image_dto import (
     ProcessImageRequest,
     ProcessImageResponse,
     ReduceResolutionRequest,
+    ResetImageRequest,
     RotateRequest,
     TranslateRequest,
 )
@@ -279,6 +280,122 @@ async def op_negative(
         height=entity.height,
         mime_type=entity.mime_type,
         operation="negative",
+        parameters={},
+        original_image_id=body.image_id,
+        created_at=entity.created_at.isoformat(),
+    )
+
+
+@router.post(
+    "/reset",
+    response_model=ProcessingOperationResponse,
+    summary="Reset Image to Original",
+    description="""
+    Reset an image to its original uploaded version, removing all applied filters and edits.
+    
+    **Use Cases:**
+    - Remove all filters and start fresh
+    - Return to original after multiple edits
+    - Undo all processing operations at once
+    
+    **How It Works:**
+    - Finds the root/original image in the version chain
+    - Creates a new version pointing back to the original
+    - Maintains edit history for tracking
+    - Returns URL to the original image
+    
+    **Technical Details:**
+    - Uses root_image_id to find original version
+    - No image processing required - references existing file
+    - Fast operation as it doesn't re-process the image
+    - Creates new database entry for version tracking
+    
+    **Response**: URL and metadata of the original image
+    **Authentication required**: Yes (Bearer token)
+    **Access control**: Users can only reset their own images
+    """,
+    response_description="URL and metadata of the original (reset) image",
+    responses={
+        200: {"description": "Successfully reset to original, returns URL and metadata"},
+        404: {"description": "Image not found or access denied"},
+    },
+)
+async def op_reset(
+    body: ResetImageRequest,
+    user=Depends(get_current_user),
+    image_repo=Depends(get_image_repo),
+    history_repo=Depends(get_history_repo),
+):
+    """Reset image to its original (root) version."""
+    # Get the current image
+    image = image_repo.get(body.image_id)
+    if image is None or image.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    # Find the root image
+    root_id = image.root_image_id if image.root_image_id else image.id
+    root_image = image_repo.get(root_id)
+
+    if root_image is None:
+        raise HTTPException(status_code=404, detail="Original image not found")
+
+    # If already at root, just return the current image
+    if image.id == root_id:
+        image_url = image_repo.get_public_url(root_image.path)
+        return ProcessingOperationResponse(
+            id=root_image.id,
+            url=image_url,
+            width=root_image.width,
+            height=root_image.height,
+            mime_type=root_image.mime_type,
+            operation="reset",
+            parameters={},
+            original_image_id=body.image_id,
+            created_at=root_image.created_at.isoformat(),
+        )
+
+    # Get current max version number for this root
+    version_chain = image_repo.get_version_chain(root_id, user.id)
+    next_version = max((v.version_number for v in version_chain), default=0) + 1
+
+    # Create new version pointing to the root image
+    entity = image_repo.create(
+        user_id=user.id,
+        path=root_image.path,  # Reuse root image path
+        width=root_image.width,
+        height=root_image.height,
+        mime_type=root_image.mime_type,
+        original_id=image.id,  # Parent is the current image
+        original_filename=root_image.original_filename,
+        file_size=root_image.file_size,
+        root_image_id=root_id,
+        parent_version_id=image.id,
+        version_number=next_version,
+        is_root=False,
+        base_image_id=root_id,  # Base is the root image
+    )
+
+    # Record in history
+    history_repo.create(
+        user_id=user.id,
+        image_id=entity.id,
+        operation_type="reset",
+        parameters={},
+        result_storage_path=entity.path,
+        source_image_id=image.id,
+        root_image_id=root_id,
+    )
+
+    # Generate URL to access the original image
+    image_url = image_repo.get_public_url(entity.path)
+
+    return ProcessingOperationResponse(
+        id=entity.id,
+        url=image_url,
+        width=entity.width,
+        height=entity.height,
+        mime_type=entity.mime_type,
+        operation="reset",
         parameters={},
         original_image_id=body.image_id,
         created_at=entity.created_at.isoformat(),
@@ -841,53 +958,33 @@ async def op_merge(
 async def op_channel(
     body: ChannelRequest,
     user=Depends(get_current_user),
+    storage=Depends(get_storage),
+    image_repo=Depends(get_image_repo),
+    history_repo=Depends(get_history_repo),
     processing: ProcessingService = Depends(get_processing_service),
 ):
-    # Implement minimal channel toggle/extract
-    images = get_image_repo()
-    storage = get_storage()
-    history = get_history_repo()
-    src_meta = images.get(body.image_id)
-    if src_meta is None or src_meta.user_id != user.id:
-        raise HTTPException(status_code=404, detail="Image not found")
-    arr = storage.download_to_numpy(src_meta.path)
-    import numpy as np
+    """Process channel operations using ProcessImageUseCase to ensure root image is used."""
+    # Use ProcessImageUseCase to ensure consistent base image selection
+    uc = ProcessImageUseCase(
+        storage=storage,
+        image_repo=image_repo,
+        history_repo=history_repo,
+        processing=processing,
+    )
 
-    ch = body.channel.lower()
-    rgb = np.repeat(arr[..., None], 3, axis=2) if arr.ndim == 2 else arr.copy()
-    if ch in ("red", "green", "blue"):
-        idx = {"red": 0, "green": 1, "blue": 2}[ch]
-        if body.enabled:
-            # zero-out other channels
-            for c in range(3):
-                if c != idx:
-                    rgb[..., c] = 0
-        else:
-            rgb[..., idx] = 0
-    elif ch in ("cyan", "magenta", "yellow"):
-        # produce grayscale of selected CMY channel
-        idx = {"cyan": 0, "magenta": 1, "yellow": 2}[ch]
-        cmy = 1.0 - rgb[..., :3]
-        rgb = cmy[..., idx]
-    else:
-        raise HTTPException(status_code=400, detail="Invalid channel")
-    stored = storage.upload_numpy(user.id, rgb, ext="png")
-    entity = images.create(
-        user_id=user.id,
-        path=stored.path,
-        width=stored.width,
-        height=stored.height,
-        mime_type=stored.content_type,
-        original_id=src_meta.id,
-        original_filename=src_meta.original_filename,
-        file_size=stored.size,
-    )
-    history.create(
-        user.id, entity.id, "channel", {"channel": body.channel, "enabled": body.enabled}
-    )
+    try:
+        # Convert channel operation to use case format
+        operation = f"channel_{body.channel.lower()}"
+        params = {"enabled": body.enabled}
+
+        entity = uc.execute(user.id, body.image_id, operation, params)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Processing failed: {str(e)}") from e
 
     # Generate URL to access the processed image
-    image_url = images.get_public_url(entity.path)
+    image_url = image_repo.get_public_url(entity.path)
 
     return ProcessingOperationResponse(
         id=entity.id,

@@ -3,8 +3,10 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from src.application.dtos.history_dto import DeleteHistoryResponse, HistoryItem, ListHistoryResponse
-from src.infrastructure.api.dependencies import get_current_user, get_history_repo
+from src.application.dtos.image_dto import ImageMetadata
+from src.infrastructure.api.dependencies import get_current_user, get_history_repo, get_image_repo
 from src.infrastructure.database.repositories.history_repository import HistoryRepository
+from src.infrastructure.database.repositories.image_repository import ImageRepository
 
 router = APIRouter(
     prefix="/history",
@@ -37,6 +39,7 @@ router = APIRouter(
 async def list_history(
     user=Depends(get_current_user),
     history: HistoryRepository = Depends(get_history_repo),
+    image_repo: ImageRepository = Depends(get_image_repo),
     limit: int = Query(
         50, ge=1, le=200, description="Maximum number of history items to return (1-200)"
     ),
@@ -48,7 +51,28 @@ async def list_history(
     if image_id:
         items = [h for h in items if h.image_id == image_id]
     page = items[offset : offset + limit]
-    out = [HistoryItem.from_entity(h) for h in page]
+
+    # Fetch image metadata for each history item
+    out = []
+    for h in page:
+        img = image_repo.get(h.image_id)
+        img_metadata = None
+        if img:
+            img_metadata = ImageMetadata(
+                id=img.id,
+                user_id=img.user_id,
+                path=img.path,
+                width=img.width,
+                height=img.height,
+                mime_type=img.mime_type,
+                created_at=img.created_at,
+                original_id=img.original_id,
+                original_filename=img.original_filename,
+                file_size=img.file_size,
+                url=image_repo.get_public_url(img.path),
+            )
+        out.append(HistoryItem.from_entity(h, img_metadata))
+
     return ListHistoryResponse(history=out)
 
 
@@ -74,12 +98,32 @@ async def get_history(
     history_id: str,
     user=Depends(get_current_user),
     history: HistoryRepository = Depends(get_history_repo),
+    image_repo: ImageRepository = Depends(get_image_repo),
 ):
     """Get detailed information about a specific history item."""
     item = history.get(history_id)
     if item is None or item.user_id != user.id:
         raise HTTPException(status_code=404, detail="History item not found or access denied")
-    return HistoryItem.from_entity(item)
+
+    # Fetch image metadata
+    img = image_repo.get(item.image_id)
+    img_metadata = None
+    if img:
+        img_metadata = ImageMetadata(
+            id=img.id,
+            user_id=img.user_id,
+            path=img.path,
+            width=img.width,
+            height=img.height,
+            mime_type=img.mime_type,
+            created_at=img.created_at,
+            original_id=img.original_id,
+            original_filename=img.original_filename,
+            file_size=img.file_size,
+            url=image_repo.get_public_url(img.path),
+        )
+
+    return HistoryItem.from_entity(item, img_metadata)
 
 
 @router.delete(
