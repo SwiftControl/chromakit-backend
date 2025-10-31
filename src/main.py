@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import os
+from pathlib import Path
+
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from src.infrastructure.api.middlewares import add_default_middlewares
 from src.infrastructure.api.routes.auth_routes import router as auth_router
@@ -77,6 +81,19 @@ def create_app() -> FastAPI:
     app.include_router(image_router)
     app.include_router(processing_router)
     app.include_router(history_router)
+    
+    # Mount local storage for local development mode
+    # This serves files when SUPABASE_DISABLED=1 or USE_LOCAL_DB=1
+    use_local_storage = os.getenv("SUPABASE_DISABLED", "0") == "1" or os.getenv("USE_LOCAL_DB", "0") == "1"
+    if use_local_storage:
+        local_storage_dir = Path(os.getenv("SUPABASE_STORAGE_LOCAL_DIR", ".local_storage"))
+        local_storage_dir.mkdir(parents=True, exist_ok=True)
+        app.mount(
+            "/local-storage",
+            StaticFiles(directory=str(local_storage_dir)),
+            name="local-storage"
+        )
+    
     return app
 
 

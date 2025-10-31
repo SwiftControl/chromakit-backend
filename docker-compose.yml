@@ -1,6 +1,28 @@
 version: '3.8'
 
 services:
+  # PostgreSQL database for local development
+  postgres:
+    image: postgres:16-alpine
+    container_name: chromakit-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-chromakit}
+      - POSTGRES_USER=${POSTGRES_USER:-chromakit}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-chromakit_dev_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-chromakit} -d ${POSTGRES_DB:-chromakit}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - chromakit-network
+
   chromakit-backend:
     build: .
     container_name: chromakit-backend
@@ -8,14 +30,29 @@ services:
     ports:
       - "8000:8000"
     environment:
+      # Supabase (auth only)
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
       - SUPABASE_STORAGE_BUCKET=${SUPABASE_STORAGE_BUCKET:-images}
+      # Local mode settings
       - SUPABASE_DISABLED=${SUPABASE_DISABLED:-0}
+      - USE_LOCAL_DB=${USE_LOCAL_DB:-0}
       - SUPABASE_STORAGE_LOCAL_DIR=${SUPABASE_STORAGE_LOCAL_DIR:-.local_storage}
+      # PostgreSQL connection
+      - POSTGRES_HOST=${POSTGRES_HOST:-postgres}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_DB=${POSTGRES_DB:-chromakit}
+      - POSTGRES_USER=${POSTGRES_USER:-chromakit}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-chromakit_dev_password}
+      # Application settings
+      - ENV=${ENV:-development}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
     volumes:
-      # Persist local storage if SUPABASE_DISABLED=1
+      # Persist local storage for demo/local mode
       - ./data/.local_storage:/app/.local_storage
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
@@ -24,6 +61,7 @@ services:
       start_period: 10s
     networks:
       - chromakit-network
+
   nginx:
     image: nginx:alpine
     container_name: chromakit-nginx
@@ -44,6 +82,10 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+
+volumes:
+  postgres_data:
+    driver: local
 
 networks:
   chromakit-network:

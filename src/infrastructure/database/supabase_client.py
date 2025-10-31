@@ -55,12 +55,16 @@ _STORAGE_CLIENT_SINGLETON: Client | None = None
 
 
 def get_supabase_client() -> Client | None:
-    """Get Supabase client for auth and database operations (uses anon key)."""
+    """Get Supabase client for auth and database operations (uses anon key).
+    
+    Note: When USE_LOCAL_DB=1, this returns None and PostgreSQL is used instead.
+    """
     global _CLIENT_SINGLETON
     disabled = os.getenv("SUPABASE_DISABLED", "0") == "1"
+    use_local_db = os.getenv("USE_LOCAL_DB", "0") == "1"
     url = os.getenv("SUPABASE_URL")
     key = os.getenv("SUPABASE_ANON_KEY")
-    if disabled or create_client is None or not url or not key:
+    if disabled or use_local_db or create_client is None or not url or not key:
         return None
     if _CLIENT_SINGLETON is None:
         _CLIENT_SINGLETON = create_client(url, key)
