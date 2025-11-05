@@ -2,6 +2,10 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from src.application.dtos.batch_processing_dto import (
+    BatchProcessRequest,
+    BatchProcessResponse,
+)
 from src.application.dtos.common_dto import HistogramResponse, ProcessingOperationResponse
 from src.application.dtos.image_dto import (
     BinarizeRequest,
@@ -21,6 +25,7 @@ from src.application.dtos.image_dto import (
     RotateRequest,
     TranslateRequest,
 )
+from src.application.use_cases.batch_process_image import BatchProcessImageUseCase
 from src.application.use_cases.process_image import ProcessImageUseCase
 from src.domain.services.processing_service import ProcessingService
 from src.infrastructure.api.dependencies import (
@@ -41,6 +46,129 @@ router = APIRouter(
         422: {"description": "Validation Error - Invalid request format"},
     },
 )
+
+
+@router.post(
+    "/batch",
+    response_model=BatchProcessResponse,
+    summary="Batch Process Image (Unified Endpoint)",
+    description="""
+    Apply multiple image processing operations in a single request.
+    
+    **Key Features:**
+    - All operations are applied to the **root/original** image, not chained modifications
+    - Multiple operations applied in sequence (brightness, contrast, channels, etc.)
+    - Prevents cumulative degradation from modification over modification
+    - Returns a single processed result with all modifications applied
+    
+    **How It Works:**
+    1. System finds the root/original image (even if you reference a processed version)
+    2. Applies all operations in order to that original
+    3. Saves only the final result as a new version
+    
+    **Example Use Cases:**
+    - Adjust brightness AND contrast in one request
+    - Convert to grayscale AND adjust brightness
+    - Modify multiple color channels at once
+    - Apply any combination of filters and adjustments
+    
+    **Supported Operations:**
+    - `brightness` - params: `{"factor": 1.2}`
+    - `log_contrast` - params: `{"k": 1.5}`
+    - `exp_contrast` - params: `{"k": 1.5}`
+    - `invert` - params: `{}`
+    - `grayscale_average` - params: `{}`
+    - `grayscale_luminosity` - params: `{}`
+    - `grayscale_midgray` - params: `{}`
+    - `binarize` - params: `{"threshold": 0.5}`
+    - `translate` - params: `{"dx": 10, "dy": 20}`
+    - `rotate` - params: `{"angle": 45.0}`
+    - `crop` - params: `{"x_start": 0, "x_end": 100, "y_start": 0, "y_end": 100}`
+    - `reduce_resolution` - params: `{"factor": 2}`
+    - `enlarge_region` - params: `{"x_start": 0, "x_end": 50, "y_start": 0, "y_end": 50, "factor": 2}`
+    - `merge_images` - params: `{"other_image_id": "img_xyz", "transparency": 0.5}`
+    - `channel_red` - params: `{"enabled": true}`
+    - `channel_green` - params: `{"enabled": true}`
+    - `channel_blue` - params: `{"enabled": false}`
+    - `channel_cyan` - params: `{"enabled": true}`
+    - `channel_magenta` - params: `{"enabled": true}`
+    - `channel_yellow` - params: `{"enabled": true}`
+    
+    **Example Request:**
+    ```json
+    {
+      "image_id": "img_123456",
+      "operations": [
+        {"operation": "brightness", "params": {"factor": 1.2}},
+        {"operation": "log_contrast", "params": {"k": 1.5}},
+        {"operation": "channel_blue", "params": {"enabled": false}}
+      ]
+    }
+    ```
+    
+    **Response**: URL and metadata for the final processed image
+    **Authentication required**: Yes (Bearer token)
+    **Access control**: Users can only process their own images
+    """,
+    response_description="URL and metadata of the final processed image with all operations applied",
+    responses={
+        200: {"description": "Successfully processed image with all operations"},
+        400: {"description": "Invalid operation or parameters"},
+        404: {"description": "Image not found or access denied"},
+    },
+)
+async def batch_process_image(
+    body: BatchProcessRequest,
+    user=Depends(get_current_user),
+    storage=Depends(get_storage),
+    image_repo=Depends(get_image_repo),
+    history_repo=Depends(get_history_repo),
+    processing: ProcessingService = Depends(get_processing_service),
+):
+    """
+    Apply multiple operations to the root/original image in a single request.
+    
+    This is the RECOMMENDED endpoint for image processing as it:
+    - Prevents cumulative modifications
+    - Allows multiple adjustments in one operation
+    - Always produces predictable results based on the original image
+    """
+    uc = BatchProcessImageUseCase(
+        storage=storage,
+        image_repo=image_repo,
+        history_repo=history_repo,
+        processing=processing,
+    )
+
+    try:
+        # Convert operations to dict format
+        operations_list = [
+            {"operation": op.operation, "params": op.params} for op in body.operations
+        ]
+        
+        entity = uc.execute(user.id, body.image_id, operations_list)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Processing failed: {str(e)}") from e
+
+    # Generate URL to access the processed image
+    image_url = image_repo.get_public_url(entity.path)
+
+    # Determine root image ID
+    root_id = entity.root_image_id if entity.root_image_id else entity.id
+
+    return BatchProcessResponse(
+        id=entity.id,
+        url=image_url,
+        width=entity.width,
+        height=entity.height,
+        mime_type=entity.mime_type,
+        operations_applied=body.operations,
+        original_image_id=body.image_id,
+        root_image_id=root_id,
+        created_at=entity.created_at.isoformat(),
+    )
 
 
 @router.get(
@@ -928,22 +1056,39 @@ async def op_merge(
     Enable/disable specific color channels or extract CMY channels and return URL to 
     access the processed result.
     
+    **⚠️ IMPORTANT:** For toggling multiple channels or re-enabling channels, use the 
+    `/processing/batch` endpoint instead. See documentation for details.
+    
     **Supported Channels:**
     - `red`, `green`, `blue` - RGB color channels
     - `cyan`, `magenta`, `yellow` - CMY color channels (computed)
     
     **Channel Operations:**
-    - **RGB Channels (enabled=true)**: Zero out other channels, keep selected
-    - **RGB Channels (enabled=false)**: Zero out selected channel, keep others  
+    - **RGB Channels (enabled=true)**: Shows ONLY this channel (isolates it, zeros out others)
+    - **RGB Channels (enabled=false)**: Hides this channel (zeros it out, keeps others visible)
     - **CMY Channels**: Extract as grayscale representation
     
+    **Common Pitfall:**
+    ```
+    # ❌ This will NOT work as expected:
+    1. Disable green → Result: [R, 0, B]  ✓
+    2. Enable green → Result: [0, G, 0]   ✗ Shows ONLY green!
+    
+    # ✅ Use batch endpoint instead:
+    POST /processing/batch with all channel states
+    ```
+    
     **Use Cases:**
-    - Color analysis and debugging
-    - Creating artistic color effects
-    - Medical/scientific image analysis
-    - Color-blind accessibility testing
+    - Isolating a single channel for analysis (enabled=true)
+    - Removing a single channel effect (enabled=false for one operation)
+    - For multiple channel adjustments: **Use `/processing/batch`**
+    
+    **Recommended Approach:**
+    Use `/processing/batch` with multiple channel operations to avoid cumulative effects.
+    See `/docs/CHANNEL_OPERATIONS_GUIDE.md` for examples.
     
     **Technical Details:**
+    - Operations always applied to root/original image
     - RGB operations manipulate existing color channels
     - CMY channels computed as (1 - RGB) then extracted
     - Uses NumPy for efficient channel operations

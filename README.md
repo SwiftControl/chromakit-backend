@@ -132,6 +132,22 @@ Run a processing operation (brightness) and check history:
 ```bash
 # Replace IMG_ID with the id returned by the upload step
 IMG_ID=img_1
+
+# Option 1: Use the unified batch endpoint (RECOMMENDED)
+curl -X POST \
+  -H 'Authorization: Bearer test-token' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "image_id": "'$IMG_ID'",
+    "operations": [
+      {"operation": "brightness", "params": {"factor": 1.2}},
+      {"operation": "log_contrast", "params": {"k": 1.5}},
+      {"operation": "grayscale_luminosity", "params": {}}
+    ]
+  }' \
+  http://127.0.0.1:8000/processing/batch
+
+# Option 2: Use individual endpoint (for single operations)
 curl -X POST \
   -H 'Authorization: Bearer test-token' \
   -H 'Content-Type: application/json' \
@@ -225,6 +241,11 @@ uv run black .
 - `DELETE /images/{image_id}` - Delete image
 
 **Image Processing** (all return processed image URLs):
+- `POST /processing/batch` - **[RECOMMENDED]** Apply multiple operations to original image in one request
+  - Prevents cumulative degradation
+  - All operations applied to root/original image
+  - Single network request, single result
+  - 📖 [Complete Batch Processing Guide →](docs/BATCH_PROCESSING.md)
 - `POST /processing/brightness` - Adjust brightness
 - `POST /processing/contrast` - Adjust contrast (logarithmic/exponential)
 - `POST /processing/negative` - Create negative/inverted image
